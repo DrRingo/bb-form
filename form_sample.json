@@ -1,0 +1,84 @@
+{
+  "title": "Phiếu Khai Báo Y Tế Tổng Quát",
+  "description": "Vui lòng điền đầy đủ thông tin bên dưới để hỗ trợ quá trình khám và chẩn đoán.",
+  "fields": [
+    {
+      "id": "name",
+      "label": "Họ và tên",
+      "type": "text",
+      "required": true
+    },
+    {
+      "id": "age",
+      "label": "Tuổi",
+      "type": "number",
+      "required": true
+    },
+    {
+      "id": "gender",
+      "label": "Giới tính",
+      "type": "select",
+      "options": ["Nam", "Nữ", "Khác"],
+      "required": true,
+      "branch": {
+        "Nữ": [
+          {
+            "id": "is_pregnant",
+            "label": "Bạn có đang mang thai không?",
+            "type": "select",
+            "options": ["Có", "Không"],
+            "branch": {
+              "Có": [
+                {
+                  "id": "gestational_age",
+                  "label": "Tuổi thai (tuần)",
+                  "type": "number",
+                  "required": true
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "symptoms",
+      "label": "Bạn có triệu chứng nào sau đây?",
+      "type": "multiselect",
+      "options": ["Sốt", "Ho", "Khó thở", "Mệt mỏi", "Không có"],
+      "required": false,
+      "branch": {
+        "Sốt": [
+          {
+            "id": "temperature",
+            "label": "Nhiệt độ cơ thể hiện tại (°C)",
+            "type": "number",
+            "required": false
+          }
+        ],
+        "Khó thở": [
+          {
+            "id": "breath_level",
+            "label": "Mức độ khó thở",
+            "type": "select",
+            "options": ["Nhẹ", "Vừa", "Nặng"],
+            "required": false
+          }
+        ]
+      }
+    },
+    {
+      "id": "exam_date",
+      "label": "Ngày khám",
+      "type": "date",
+      "required": true
+    },
+    {
+      "id": "notes",
+      "label": "Ghi chú thêm (tuỳ chọn)",
+      "type": "text",
+      "required": false
+    }
+  ]
+}
+
