@@ -1,0 +1,22 @@
+{
+  "age" : 32,
+  "symtoms" : "Ho",
+  "" : {
+    "name" : "jflaj",
+    "age" : 32,
+    "gender" : "Nữ",
+    "symptoms" : [ "Khó thở" ],
+    "exam_date" : "fjsaljf",
+    "notes" : "fjalfj"
+  },
+  "gender" : {
+    "Nữ" : {
+      "is_pregnant" : "Không"
+    }
+  },
+  "symptoms" : {
+    "Khó thở" : {
+      "breath_level" : "Nặng"
+    }
+  }
+}
