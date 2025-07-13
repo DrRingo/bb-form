@@ -32,7 +32,7 @@
 (defn should-skip? [id path]
   (let [field-path (conj path (keyword id))
         v (get-in @answers field-path)]
-    (println "DEBUG should-skip? id:" id "path:" path "field-path:" field-path "value:" v)
+    ;; (println "DEBUG should-skip? id:" id "path:" path "field-path:" field-path "value:" v)
     (or (and (map? v) (contains? v :_value))
         (and (not (map? v)) (some? v)))))
 
@@ -42,7 +42,7 @@
 (defn get-prefilled [id path]
   (let [field-path (conj path (keyword id))
         v (get-in @answers field-path)]
-    (println "DEBUG get-prefilled id:" id "path:" path "field-path:" field-path "value:" v)
+    ;; (println "DEBUG get-prefilled id:" id "path:" path "field-path:" field-path "value:" v)
     (if (map? v)
       (:_value v)
       v)))
@@ -189,13 +189,13 @@
 
 ;; Hàm chính để chạy form
 ;; Tham số: form - cấu trúc form chứa title, description và fields
-;; Trả về: không có (side effect - hiển thị form, lưu kết quả vào result.json)
+;; Trả về: không có (side effect - hiển thị form)
 (defn run-form [form]
   (println "\n📝" (:title form))
   (println (:description form) "\n")
   (doseq [field (:fields form)]
     (ask-field field [:selectedByUser]))
-  (spit "result.json" (json/generate-string @answers {:pretty true}))
-  (println "\n✅ Kết quả đã lưu vào result.json"))
+  ;; Việc lưu file được xử lý trong run-form.clj
+  )
 
 

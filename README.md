@@ -83,6 +83,16 @@ bb run-form.clj form.json --values values.json
 bb run-form.clj form.json field1:value1 field2:value2
 ```
 
+### Chạy với tùy chọn xuất file tùy chỉnh:
+```bash
+bb run-form.clj form.json --out path/myfilename.json
+```
+
+### Kết hợp các tùy chọn:
+```bash
+bb run-form.clj form.json --values values.json --out output.json field1:value1
+```
+
 ## File kết quả
 
 Kết quả được lưu vào file `result.json` với cấu trúc:
