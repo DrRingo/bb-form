@@ -31,6 +31,7 @@ Script sử dụng Clojure Babashka và Charm-gum để thu thập dữ liệu t
       "type": "loại_field",
       "required": true/false,
       "options": ["lựa chọn 1", "lựa chọn 2"],
+      "regex": "^[a-zA-Z0-9]+$",
       "branch": {
         "lựa chọn": [
           {
@@ -46,10 +47,22 @@ Script sử dụng Clojure Babashka và Charm-gum để thu thập dữ liệu t
 }
 ```
 
+### Ví dụ field text với regex:
+```json
+{
+  "id": "email",
+  "label": "Email",
+  "type": "text",
+  "required": true,
+  "regex": "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$",
+  "regexError": "Email không đúng định dạng. Ví dụ: user@example.com"
+}
+```
+
 ### Các loại field hỗ trợ:
-- `text`: Input văn bản
+- `text`: Input văn bản (hỗ trợ validation regex)
 - `number`: Input số nguyên với validation
-- `date`: Input ngày tháng (format YYYY-MM-DD)
+- `date`: Input ngày tháng (format DD-MM-YYYY) với validation
 - `select`: Dropdown chọn một lựa chọn
 - `multiselect`: Chọn nhiều lựa chọn
 
@@ -60,6 +73,14 @@ Script sử dụng Clojure Babashka và Charm-gum để thu thập dữ liệu t
 - `required`: Kiểm tra ràng buộc đầu vào (true/false)
 - `options`: Danh sách lựa chọn cho select/multiselect
 - `branch`: Logic phân nhánh - hiển thị field con dựa trên lựa chọn
+- `regex`: Biểu thức chính quy để validate field text (tùy chọn)
+- `regexError`: Thông báo lỗi tùy chỉnh khi regex không thỏa mãn (tùy chọn)
+
+### Validation rules:
+- **text**: Hỗ trợ regex validation với thông báo lỗi tùy chỉnh
+- **number**: Bắt buộc nhập số nguyên
+- **date**: Bắt buộc nhập đúng định dạng DD-MM-YYYY, nếu để trống sẽ tự động lấy ngày hôm nay
+  - Hỗ trợ gõ tắt: `04` (ngày 04 tháng hiện tại năm hiện tại), `1204` (ngày 12 tháng 04 năm hiện tại)
 
 ### Tính năng phân nhánh (Branching):
 - Cho phép hiển thị field con dựa trên lựa chọn của field cha

@@ -54,8 +54,68 @@
   (case type
     "number" (try (Integer/parseInt (str v)) (catch Exception _ v))
     "text"   (str v)
-    "date"   (str v)
+    "date"   (let [s (str v)]
+                 (if (re-matches #"^\d{2}-\d{2}-\d{4}$" s)
+                   (try
+                     (let [dt (java.time.LocalDate/parse s (java.time.format.DateTimeFormatter/ofPattern "dd-MM-yyyy"))]
+                       (.format dt (java.time.format.DateTimeFormatter/ofPattern "yyyy-MM-dd")))
+                     (catch Exception _ s))
+                   s))
     v))
+
+;; Lấy ngày hôm nay theo định dạng DD-MM-YYYY
+;; Trả về: chuỗi ngày hôm nay
+(defn today []
+  (let [now (java.time.LocalDate/now)]
+    (.format now (java.time.format.DateTimeFormatter/ofPattern "dd-MM-yyyy"))))
+
+;; Lấy tháng và năm hiện tại
+;; Trả về: map với :month và :year
+(defn current-month-year []
+  (let [now (java.time.LocalDate/now)]
+    {:month (.getMonthValue now)
+     :year (.getYear now)}))
+
+;; Xử lý gõ tắt cho ngày tháng
+;; Tham số: input - chuỗi người dùng nhập
+;; Trả về: chuỗi ngày tháng đầy đủ DD-MM-YYYY
+(defn expand-date-shortcut [input]
+  (let [trimmed (str/trim input)
+        {:keys [month year]} (current-month-year)]
+    (cond
+      ;; Gõ 2 chữ số: dd (lấy tháng và năm hiện tại)
+      (re-matches #"^\d{2}$" trimmed)
+      (let [dd (Integer/parseInt trimmed)]
+        (format "%02d-%02d-%d" dd month year))
+      
+      ;; Gõ 4 chữ số: ddmm (lấy năm hiện tại)
+      (re-matches #"^\d{4}$" trimmed)
+      (let [dd (Integer/parseInt (subs trimmed 0 2))
+            mm (Integer/parseInt (subs trimmed 2 4))]
+        (format "%02d-%02d-%d" dd mm year))
+      
+      ;; Gõ đầy đủ DD-MM-YYYY hoặc DD/MM/YYYY
+      (re-matches #"^\d{2}[-/]\d{2}[-/]\d{4}$" trimmed)
+      (str/replace trimmed #"[/]" "-")
+      
+      ;; Các trường hợp khác, giữ nguyên
+      :else trimmed)))
+
+;; Kiểm tra tính hợp lệ của ngày tháng
+;; Tham số: date-str - chuỗi ngày tháng theo định dạng DD-MM-YYYY
+;; Trả về: true nếu ngày tháng hợp lệ, false nếu không
+(defn valid-date? [date-str]
+  (if-let [[_ dd mm yyyy] (re-matches #"^(\d{2})-(\d{2})-(\d{4})$" date-str)]
+    (let [d (Integer/parseInt dd)
+          m (Integer/parseInt mm)
+          y (Integer/parseInt yyyy)
+          max-day (cond
+                     (or (< m 1) (> m 12)) 0
+                     (= m 2) (if (or (zero? (mod y 400)) (and (zero? (mod y 4)) (not (zero? (mod y 100))))) 29 28)
+                     (#{4 6 9 11} m) 30
+                     :else 31)]
+      (and (<= 1 d max-day)))
+    false))
 
 ;; Helper ép kiểu về map nếu không phải map
 (defn force-map [v]
@@ -117,13 +177,17 @@
           (ask-field sub branch-path))))))
 
 ;; Xử lý field kiểu text
-;; Tham số: field - thông tin field (id, label, required, branch), path - đường dẫn
+;; Tham số: field - thông tin field (id, label, required, branch, regex, regexError), path - đường dẫn
 ;; Trả về: không có (side effect - cập nhật answers và xử lý branch)
-(defmethod ask-field :text [{:keys [id label required branch]} path]
+(defmethod ask-field :text [{:keys [id label required branch regex regexError]} path]
   (let [id-k (keyword id)
         value (if (should-skip? id path)
                 (get-prefilled id path)
-                (gum-input label))]
+                (loop []
+                  (let [v (gum-input label)]
+                    (if (and regex (not (re-matches (re-pattern regex) v)))
+                      (do (println (str "⚠️ " (or regexError (str "Giá trị không khớp với regex: " regex)))) (recur))
+                      v))))]
     (when (or (not required) (not (str/blank? (str value))))
       (swap! answers update-in path #(assoc (force-map %) id-k (parse-value value "text"))))
     (handle-branch branch value (conj path id-k))))
@@ -151,9 +215,16 @@
   (let [id-k (keyword id)
         value (if (should-skip? id path)
                 (get-prefilled id path)
-                (gum-input (str label " (YYYY-MM-DD)")))]
-    (when (or (not required) (not (str/blank? value)))
-      (swap! answers update-in path #(assoc (force-map %) id-k (parse-value value "date"))))
+                (loop []
+                  (let [v (gum-input (str label " (DD-MM-YYYY hoặc gõ tắt: 04, 1204)"))]
+                    (cond
+                      (str/blank? v) (today)
+                      :else
+                      (let [expanded (expand-date-shortcut v)]
+                        (if (not (valid-date? expanded))
+                          (do (println "⚠️ Ngày tháng không hợp lệ. Ví dụ: 31-12-2023") (recur))
+                          expanded))))))]
+    (swap! answers update-in path #(assoc (force-map %) id-k (parse-value value "date")))
     (handle-branch branch value (conj path id-k))))
 
 ;; Xử lý field kiểu select (dropdown một lựa chọn)

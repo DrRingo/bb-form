@@ -1,10 +1,16 @@
 {
   "selectedByUser" : {
-    "searchMethod" : "Tìm theo tên",
-    "searchMethod_branch" : {
-      "Tìm theo tên" : {
-        "searchByNameSearch" : "fljsl"
+    "name" : "ringo",
+    "gender" : "Nam",
+    "symptoms" : [ "Khó thở" ],
+    "symptoms_branch" : {
+      "Khó thở" : {
+        "breath_level" : "Vừa",
+        "breath_start_date" : "2025-02-12",
+        "emergency_contact" : "2380843919"
       }
-    }
+    },
+    "exam_date" : "2025-01-12",
+    "notes" : "jdlajfa"
   }
 }
