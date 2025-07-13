@@ -90,17 +90,92 @@ Kết quả được lưu vào file `result.json` với cấu trúc:
 {
   "selectedByUser": {
     "field1": "value1",
-    "field2": "value2"
-  },
-  "field1": {
-    "value1": {
-      "subfield": "subvalue"
+    "field2": "value2",
+    "field_with_branch": "selected_option",
+    "field_with_branch_branch": {
+      "selected_option": {
+        "subfield1": "subvalue1",
+        "subfield2": "subvalue2"
+      }
+    },
+    "multiselect_field": ["option1", "option2"],
+    "multiselect_field_branch": {
+      "option1": {
+        "subfield1": "subvalue1"
+      },
+      "option2": {
+        "subfield2": "subvalue2"
+      }
     }
   }
 }
 ```
 
+### Cấu trúc dữ liệu:
+- **Level cao nhất**: Tất cả các field được nhóm vào key `"selectedByUser"`
+- **Field đơn giản**: Giá trị trực tiếp (text, number, date, select)
+- **Field có branching**: 
+  - Giá trị gốc được lưu trực tiếp
+  - Field con được lưu trong key `"{field_id}_branch"`
+- **Field multiselect**: 
+  - Danh sách các lựa chọn được lưu trực tiếp
+  - Field con được lưu trong key `"{field_id}_branch"`
+- **Cấu trúc thống nhất**: Cả select và multiselect đều dùng suffix `"_branch"`
+- **Hỗ trợ nhiều cấp**: Có thể có field con của field con
+- **Lồng nhiều cấp**: Field con có thể tiếp tục có nhánh, tạo ra `{subfield_id}_branch`
+
+### Ví dụ cấu trúc phức tạp:
+```json
+{
+  "selectedByUser": {
+    "name": "Nguyễn Văn A",
+    "age": 25,
+    "gender": "Nữ",
+    "gender_branch": {
+      "Nữ": {
+        "is_pregnant": "Có",
+        "is_pregnant_branch": {
+          "Có": {
+            "gestational_age": 20
+          }
+        }
+      }
+    },
+    "symptoms": ["Sốt", "Khó thở"],
+    "symptoms_branch": {
+      "Sốt": {
+        "temperature": 38.5
+      },
+      "Khó thở": {
+        "breath_level": "Vừa"
+      }
+    },
+    "exam_date": "2024-01-15",
+    "notes": "Ghi chú thêm"
+  }
+}
+```
+
+### Cách truy cập dữ liệu:
+```javascript
+// Giá trị gốc
+const gender = result.selectedByUser.gender; // "Nữ"
+const symptoms = result.selectedByUser.symptoms; // ["Sốt", "Khó thở"]
+
+// Field con của select
+const isPregnant = result.selectedByUser.gender_branch["Nữ"].is_pregnant; // "Có"
+const gestationalAge = result.selectedByUser.gender_branch["Nữ"].is_pregnant_branch["Có"].gestational_age; // 20
+
+// Field con của multiselect
+const temperature = result.selectedByUser.symptoms_branch["Sốt"].temperature; // 38.5
+const breathLevel = result.selectedByUser.symptoms_branch["Khó thở"].breath_level; // "Vừa"
+```
+
 ### Lưu ý:
-- Các field ở level cao nhất được nhóm vào key `"selectedByUser"`
-- Các field con được tổ chức theo cấu trúc phân cấp
-- Hỗ trợ lưu trữ dữ liệu phức tạp với nhiều cấp độ
+- Tất cả các field ở level cao nhất được nhóm vào key `"selectedByUser"`
+- **Giá trị gốc luôn nhất quán**: Field có branching vẫn lưu giá trị được chọn trực tiếp
+- **Cấu trúc thống nhất**: Cả select và multiselect đều dùng suffix `"_branch"`
+- **Key trong _branch**: Là giá trị được chọn (ví dụ "Nữ", "Sốt", "Khó thở")
+- **Dễ xử lý**: Không cần kiểm tra kiểu dữ liệu khi truy cập giá trị gốc
+- **Cấu trúc rõ ràng**: Field con được tổ chức theo logic phân cấp
+- **Lồng nhiều cấp**: Hỗ trợ branching không giới hạn độ sâu

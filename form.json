@@ -10,22 +10,24 @@
       "required": true,
       "branch": {
         "UUID": [{ 
-      "id": "uuid",
-      "label": "Nhập uuid của đài radio",
-      "type": "text",
-      "required": false
-    }],
+          "id": "uuid",
+          "label": "Nhập uuid của đài radio",
+          "type": "text",
+          "required": false
+        }],
         "Tìm theo tên": [{
-      "id": "searchByNameSearch",
-      "label": "Tên đài cần tìm",
-      "type": "text",
-      "required": false
-    }],
+          "id": "searchByNameSearch",
+          "label": "Tên đài cần tìm",
+          "type": "text",
+          "required": false
+        }],
         "Tìm theo quốc gia": [{
-      "id": "searchbyNation",
-      "label": "Kí hiệu quốc gia (2 chữ) cần tìm",
-      "type": "text",
-      "required": false
-    }]
+          "id": "searchbyNation",
+          "label": "Kí hiệu quốc gia (2 chữ) cần tìm",
+          "type": "text",
+          "required": false
+        }]
       }
-    }]}
+    }
+  ]
+}

@@ -48,6 +48,15 @@
     "date"   (str v)
     v))
 
+;; Helper ép kiểu về map nếu không phải map
+(defn force-map [v]
+  (cond
+    (map? v) v
+    (string? v) {:_value v}
+    (number? v) {:_value v}
+    (nil? v) {}
+    :else {}))
+
 ;; -------------------------------
 ;; GUM UI
 ;; -------------------------------
@@ -93,7 +102,10 @@
         norm-branch (into {} (map (fn [[k v]] [(normalize-branch-key k) v]) branch))]
     (when-let [subfields (get norm-branch norm-key)]
       (doseq [sub subfields]
-        (ask-field sub (conj path (keyword raw-key)))))))
+        (let [field-id (last path)
+              branch-key (keyword (str (name field-id) "_branch"))
+              branch-path (conj (pop path) branch-key (keyword raw-key))]
+          (ask-field sub branch-path))))))
 
 ;; Xử lý field kiểu text
 ;; Tham số: field - thông tin field (id, label, required, branch), path - đường dẫn
@@ -104,7 +116,7 @@
                 (get-prefilled id)
                 (gum-input label))]
     (when (or (not required) (not (str/blank? (str value))))
-      (swap! answers update-in path assoc id-k (parse-value value "text")))
+      (swap! answers update-in path #(assoc (force-map %) id-k (parse-value value "text"))))
     (handle-branch branch value (conj path id-k))))
 
 ;; Xử lý field kiểu number với validation
@@ -120,7 +132,7 @@
                             (try (Integer/parseInt v) true (catch Exception _ false)))
                       v
                       (do (println "⚠️ Vui lòng nhập số nguyên!") (recur))))))]
-    (swap! answers update-in path assoc id-k (parse-value value "number"))
+    (swap! answers update-in path #(assoc (force-map %) id-k (parse-value value "number")))
     (handle-branch branch value (conj path id-k))))
 
 ;; Xử lý field kiểu date
@@ -132,7 +144,7 @@
                 (get-prefilled id)
                 (gum-input (str label " (YYYY-MM-DD)")))]
     (when (or (not required) (not (str/blank? value)))
-      (swap! answers update-in path assoc id-k (parse-value value "date")))
+      (swap! answers update-in path #(assoc (force-map %) id-k (parse-value value "date"))))
     (handle-branch branch value (conj path id-k))))
 
 ;; Xử lý field kiểu select (dropdown một lựa chọn)
@@ -143,7 +155,7 @@
         value (if (should-skip? id)
                 (get-prefilled id)
                 (gum-select label options))]
-    (swap! answers update-in path assoc id-k value)
+    (swap! answers update-in path #(assoc (force-map %) id-k value))
     (handle-branch branch value (conj path id-k))))
 
 ;; Xử lý field kiểu multiselect (chọn nhiều lựa chọn)
@@ -158,7 +170,7 @@
                   (string? raw) [raw]
                   (sequential? raw) raw
                   :else [])]
-    (swap! answers update-in path assoc id-k choices)
+    (swap! answers update-in path #(assoc (force-map %) id-k choices))
     (doseq [choice choices]
       (handle-branch branch choice (conj path id-k)))))
 
@@ -170,10 +182,11 @@
 ;; Tham số: form - cấu trúc form chứa title, description và fields
 ;; Trả về: không có (side effect - hiển thị form, lưu kết quả vào result.json)
 (defn run-form [form]
+  (reset! answers {})
   (println "\n📝" (:title form))
   (println (:description form) "\n")
   (doseq [field (:fields form)]
-    (ask-field field []))
+    (ask-field field [:selectedByUser]))
   (spit "result.json" (json/generate-string @answers {:pretty true}))
   (println "\n✅ Kết quả đã lưu vào result.json"))
 
