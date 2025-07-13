@@ -1,15 +1,33 @@
 # bb-form
 
-Script sử dụng Clojure Babashka và Charm-gum để thu thập dữ liệu từ form đẹp mắt trong terminal
+Script sử dụng Clojure Babashka và Charm-gum để thu thập dữ liệu từ form đẹp mắt trong terminal với giao diện người dùng được tối ưu hóa
 
 # Yêu cầu hệ thống
 
 - [Clojure babashka](https://babashka.org/)
 - [Charm-gum](https://github.com/charmbracelet/gum)
 
+# Tính năng giao diện người dùng
+
+## Màn hình sạch sẽ
+- Tự động xóa màn hình trước khi hiển thị form đầu tiên
+- Giao diện sạch sẽ, không có nội dung cũ từ terminal
+
+## Dòng trạng thái cố định
+- Hiển thị thông báo lỗi và trạng thái ở vị trí cố định sau tiêu đề form
+- Thông báo lỗi bắt đầu với "::::" để dễ nhận biết
+- Thông báo lỗi chỉ biến mất khi người dùng nhập đúng giá trị
+- Sử dụng GUM style để hiển thị thông báo lỗi đẹp mắt với viền đỏ
+
+## Trải nghiệm người dùng được cải thiện
+- Màn hình được cập nhật liên tục để giữ giao diện sạch sẽ
+- Thông báo lỗi rõ ràng và dễ đọc
+- Giao diện nhất quán trong suốt quá trình điền form
+- Khoảng cách hợp lý giữa các thành phần giao diện
+
 # Giải thích các file
 
-- `core.clj` :: File Clojure chính chứa các hàm xử lý form
+- `core.clj` :: File Clojure chính chứa các hàm xử lý form và giao diện người dùng
 - `run-form.clj` :: File chạy script với các tùy chọn command line
 - `form.json` :: File cấu hình form, hỗ trợ câu hỏi phân nhánh
 - `values.json` :: File chứa giá trị mặc định cho form
@@ -81,6 +99,11 @@ Script sử dụng Clojure Babashka và Charm-gum để thu thập dữ liệu t
 - **number**: Bắt buộc nhập số nguyên
 - **date**: Bắt buộc nhập đúng định dạng DD-MM-YYYY, nếu để trống sẽ tự động lấy ngày hôm nay
   - Hỗ trợ gõ tắt: `04` (ngày 04 tháng hiện tại năm hiện tại), `1204` (ngày 12 tháng 04 năm hiện tại)
+
+### Cải tiến validation:
+- Thông báo lỗi hiển thị ngay lập tức khi người dùng nhập sai
+- Màn hình được cập nhật để hiển thị thông báo lỗi rõ ràng
+- Validation được thực hiện real-time với giao diện phản hồi nhanh
 
 ### Tính năng phân nhánh (Branching):
 - Cho phép hiển thị field con dựa trên lựa chọn của field cha
@@ -210,3 +233,17 @@ const breathLevel = result.selectedByUser.symptoms_branch["Khó thở"].breath_l
 - **Dễ xử lý**: Không cần kiểm tra kiểu dữ liệu khi truy cập giá trị gốc
 - **Cấu trúc rõ ràng**: Field con được tổ chức theo logic phân cấp
 - **Lồng nhiều cấp**: Hỗ trợ branching không giới hạn độ sâu
+
+# Cập nhật gần đây
+
+## Phiên bản hiện tại
+- ✅ **Dòng trạng thái cố định**: Hiển thị thông báo lỗi ở vị trí cố định với prefix "::::"
+- ✅ **Giao diện GUM**: Sử dụng Charm-gum để hiển thị thông báo lỗi đẹp mắt
+- ✅ **Validation real-time**: Thông báo lỗi hiển thị ngay lập tức khi nhập sai
+- ✅ **Trải nghiệm người dùng**: Giao diện nhất quán và dễ sử dụng
+
+## Cải tiến kỹ thuật
+- Sửa lỗi syntax trong các hàm validation
+- Tối ưu hóa hiển thị thông báo lỗi
+- Cải thiện logic clear màn hình và re-render
+- Tăng cường tính ổn định của giao diện

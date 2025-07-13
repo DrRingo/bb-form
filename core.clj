@@ -26,11 +26,15 @@
 (defn render-header [form]
   (println "\n📝" (:title form))
   (println (:description form) "\n")
-  (println (str ":::: " @status-line)))
+  (println (str ":::: " @status-line))
+  ;; Luôn thêm dòng trống sau status line để tạo khoảng cách cố định
+  (println))
 
 ;; Hàm hiển thị thông báo lỗi với GUM
 (defn show-error [message]
-  (shell {:out :string} "gum" "style" "--foreground" "#ff0000" "--border" "normal" "--border-foreground" "#ff0000" "--margin" "1" "--padding" "1" message))
+  (shell {:out :string} "gum" "style" "--foreground" "#ff0000" "--border" "normal" "--border-foreground" "#ff0000" "--margin" "1" "--padding" "1" message)
+  ;; Thêm dòng trống sau thông báo lỗi để tạo khoảng cách
+  (println))
 
 ;; Hàm in status-line (luôn in sau tiêu đề/mô tả)
 (defn print-status []
@@ -178,9 +182,7 @@
   (print "\033[2K")  ;; Xóa dòng đó
   (flush))
 
-;; Hiển thị thông báo lỗi với GUM
-(defn show-error [message]
-  (shell {:out :string} "gum" "style" "--foreground" "#ff0000" "--border" "normal" "--border-foreground" "#ff0000" "--margin" "1" "--padding" "1" message))
+
 
 ;; Hiển thị input text với GUM
 ;; Tham số: label - nhãn hiển thị cho input
@@ -302,6 +304,7 @@
 ;; Tham số: form - cấu trúc form chứa title, description và fields
 ;; Trả về: không có (side effect - hiển thị form)
 (defn run-form [form]
+  (clear-screen)  ;; Clear màn hình trước khi hiển thị form
   (render-header form)
   (doseq [field (:fields form)]
     (ask-field field [:selectedByUser] form))
