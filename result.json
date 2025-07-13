@@ -2,14 +2,24 @@
   "selectedByUser" : {
     "age" : 32,
     "symptoms" : [ "Sốt" ],
-    "name" : "ringo",
-    "gender" : "Nam",
-    "symptoms_branch" : {
-      "Sốt" : {
-        "temperature" : 32
+    "gender" : "Nữ",
+    "gender_branch" : {
+      "Nữ" : {
+        "is_pregnant" : "Có",
+        "is_pregnant_branch" : {
+          "Có" : {
+            "gestational_age" : 34
+          }
+        }
       }
     },
-    "exam_date" : "flskj",
-    "notes" : "lfj"
+    "name" : "ringo",
+    "symptoms_branch" : {
+      "Sốt" : {
+        "temperature" : 23
+      }
+    },
+    "exam_date" : "fjlaj",
+    "notes" : "lfja"
   }
 }

@@ -1,5 +1,11 @@
 {
   "age": 32,
-  "symptoms": "Sốt"
+  "symptoms": "Sốt",
+  "gender": "Nữ",
+  "gender_branch": {
+    "Nữ": {
+      "is_pregnant": "Có"
+    }
+  }
 }
 
