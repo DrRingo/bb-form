@@ -1,16 +1,28 @@
 {
   "selectedByUser" : {
-    "name" : "ringo",
-    "gender" : "Nam",
-    "symptoms" : [ "Khó thở" ],
+    "email" : "binh@jflj.fl",
+    "age" : 32,
+    "phone" : "3131414141",
+    "name" : "jflsjf",
+    "symptoms" : [ "Sốt" ],
+    "username" : "jflsjf",
+    "exam_date" : "2025-05-31",
     "symptoms_branch" : {
-      "Khó thở" : {
-        "breath_level" : "Vừa",
-        "breath_start_date" : "2025-02-12",
-        "emergency_contact" : "2380843919"
+      "Sốt" : {
+        "temperature" : 33
       }
     },
-    "exam_date" : "2025-01-12",
-    "notes" : "jdlajfa"
+    "notes" : "jfljflaj",
+    "gender_branch" : {
+      "Nữ" : {
+        "is_pregnant" : "Có",
+        "is_pregnant_branch" : {
+          "Có" : {
+            "gestational_age" : 21
+          }
+        }
+      }
+    },
+    "gender" : "Nữ"
   }
 }

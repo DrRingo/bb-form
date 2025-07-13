@@ -6,6 +6,47 @@
 
 ;; Atom để lưu trữ tất cả câu trả lời của form
 (def answers (atom {}))
+;; Atom cho dòng trạng thái/thông báo lỗi
+(def status-line (atom ""))
+
+;; Hàm cập nhật status-line
+(defn set-status! [msg]
+  (reset! status-line msg))
+
+;; Hàm xóa status-line
+(defn clear-status! []
+  (reset! status-line ""))
+
+;; Hàm clear màn hình
+(defn clear-screen []
+  (print "\033[2J")  ;; Clear toàn bộ màn hình
+  (print "\033[H"))  ;; Di chuyển con trỏ về đầu
+
+;; Hàm render header (title, description, status-line)
+(defn render-header [form]
+  (println "\n📝" (:title form))
+  (println (:description form) "\n")
+  (println (str ":::: " @status-line)))
+
+;; Hàm hiển thị thông báo lỗi với GUM
+(defn show-error [message]
+  (shell {:out :string} "gum" "style" "--foreground" "#ff0000" "--border" "normal" "--border-foreground" "#ff0000" "--margin" "1" "--padding" "1" message))
+
+;; Hàm in status-line (luôn in sau tiêu đề/mô tả)
+(defn print-status []
+  (when (not (str/blank? @status-line))
+    (show-error @status-line)))
+
+;; Hàm clear dòng status cũ
+(defn clear-status-line []
+  (print "\033[2K")  ;; Xóa dòng hiện tại
+  (print "\033[1A")  ;; Di chuyển lên 1 dòng
+  (print "\033[2K")) ;; Xóa dòng đó
+
+;; Hàm in lại status-line (sau khi đã clear)
+(defn reprint-status []
+  (when (not (str/blank? @status-line))
+    (show-error @status-line)))
 
 ;; -------------------------------
 ;; Utility functions
@@ -130,6 +171,17 @@
 ;; GUM UI
 ;; -------------------------------
 
+;; Xóa dòng hiện tại và dòng trước đó
+(defn clear-error-lines []
+  (print "\033[2K")  ;; Xóa dòng hiện tại
+  (print "\033[1A")  ;; Di chuyển lên 1 dòng
+  (print "\033[2K")  ;; Xóa dòng đó
+  (flush))
+
+;; Hiển thị thông báo lỗi với GUM
+(defn show-error [message]
+  (shell {:out :string} "gum" "style" "--foreground" "#ff0000" "--border" "normal" "--border-foreground" "#ff0000" "--margin" "1" "--padding" "1" message))
+
 ;; Hiển thị input text với GUM
 ;; Tham số: label - nhãn hiển thị cho input
 ;; Trả về: chuỗi người dùng nhập vào
@@ -165,7 +217,7 @@
 ;; Xử lý branching logic - hiển thị field con dựa trên lựa chọn
 ;; Tham số: branch - map chứa các nhánh, value - giá trị được chọn, path - đường dẫn hiện tại
 ;; Trả về: không có (side effect - gọi ask-field cho các field con)
-(defn handle-branch [branch value path]
+(defn handle-branch [branch value path form]
   (let [raw-key (str/trim (str value))
         norm-key (normalize-branch-key value)
         norm-branch (into {} (map (fn [[k v]] [(normalize-branch-key k) v]) branch))]
@@ -174,28 +226,23 @@
         (let [field-id (last path)
               branch-key (keyword (str (name field-id) "_branch"))
               branch-path (conj (pop path) branch-key (keyword raw-key))]
-          (ask-field sub branch-path))))))
+          (ask-field sub branch-path form))))))
 
-;; Xử lý field kiểu text
-;; Tham số: field - thông tin field (id, label, required, branch, regex, regexError), path - đường dẫn
-;; Trả về: không có (side effect - cập nhật answers và xử lý branch)
-(defmethod ask-field :text [{:keys [id label required branch regex regexError]} path]
+;; Sửa các hàm validation để chỉ cập nhật status-line
+(defmethod ask-field :text [{:keys [id label required branch regex regexError]} path form]
   (let [id-k (keyword id)
         value (if (should-skip? id path)
                 (get-prefilled id path)
                 (loop []
                   (let [v (gum-input label)]
                     (if (and regex (not (re-matches (re-pattern regex) v)))
-                      (do (println (str "⚠️ " (or regexError (str "Giá trị không khớp với regex: " regex)))) (recur))
-                      v))))]
+                      (do (set-status! (or regexError (str "Giá trị không khớp với regex: " regex))) (clear-screen) (render-header form) (recur))
+                      (do (clear-status!) (clear-screen) (render-header form) v)))))]
     (when (or (not required) (not (str/blank? (str value))))
       (swap! answers update-in path #(assoc (force-map %) id-k (parse-value value "text"))))
-    (handle-branch branch value (conj path id-k))))
+    (handle-branch branch value (conj path id-k) form)))
 
-;; Xử lý field kiểu number với validation
-;; Tham số: field - thông tin field (id, label, required, branch), path - đường dẫn
-;; Trả về: không có (side effect - cập nhật answers và xử lý branch)
-(defmethod ask-field :number [{:keys [id label required branch]} path]
+(defmethod ask-field :number [{:keys [id label required branch]} path form]
   (let [id-k (keyword id)
         value (if (should-skip? id path)
                 (get-prefilled id path)
@@ -203,45 +250,38 @@
                   (let [v (gum-input label)]
                     (if (or (not required)
                             (try (Integer/parseInt v) true (catch Exception _ false)))
-                      v
-                      (do (println "⚠️ Vui lòng nhập số nguyên!") (recur))))))]
-    (swap! answers update-in path #(assoc (force-map %) id-k (parse-value value "number")))
-    (handle-branch branch value (conj path id-k))))
+                      (do (clear-status!) (clear-screen) (render-header form) v)
+                      (do (set-status! "⚠️ Vui lòng nhập số nguyên!") (clear-screen) (render-header form) (recur))))))]
+    (when (or (not required) (not (str/blank? (str value))))
+      (swap! answers update-in path #(assoc (force-map %) id-k (parse-value value "number"))))
+    (handle-branch branch value (conj path id-k) form)))
 
-;; Xử lý field kiểu date
-;; Tham số: field - thông tin field (id, label, required, branch), path - đường dẫn
-;; Trả về: không có (side effect - cập nhật answers và xử lý branch)
-(defmethod ask-field :date [{:keys [id label required branch]} path]
+(defmethod ask-field :date [{:keys [id label required branch]} path form]
   (let [id-k (keyword id)
         value (if (should-skip? id path)
                 (get-prefilled id path)
                 (loop []
                   (let [v (gum-input (str label " (DD-MM-YYYY hoặc gõ tắt: 04, 1204)"))]
                     (cond
-                      (str/blank? v) (today)
+                      (str/blank? v) (do (clear-status!) (clear-screen) (render-header form) (today))
                       :else
                       (let [expanded (expand-date-shortcut v)]
                         (if (not (valid-date? expanded))
-                          (do (println "⚠️ Ngày tháng không hợp lệ. Ví dụ: 31-12-2023") (recur))
-                          expanded))))))]
-    (swap! answers update-in path #(assoc (force-map %) id-k (parse-value value "date")))
-    (handle-branch branch value (conj path id-k))))
+                          (do (set-status! "⚠️ Ngày tháng không hợp lệ. Ví dụ: 31-12-2023") (clear-screen) (render-header form) (recur))
+                          (do (clear-status!) (clear-screen) (render-header form) expanded)))))))]
+    (when (or (not required) (not (str/blank? (str value))))
+      (swap! answers update-in path #(assoc (force-map %) id-k (parse-value value "date"))))
+    (handle-branch branch value (conj path id-k) form)))
 
-;; Xử lý field kiểu select (dropdown một lựa chọn)
-;; Tham số: field - thông tin field (id, label, options, branch), path - đường dẫn
-;; Trả về: không có (side effect - cập nhật answers và xử lý branch)
-(defmethod ask-field :select [{:keys [id label options branch]} path]
+(defmethod ask-field :select [{:keys [id label options branch]} path form]
   (let [id-k (keyword id)
         value (if (should-skip? id path)
                 (get-prefilled id path)
                 (gum-select label options))]
     (swap! answers update-in path #(assoc (force-map %) id-k value))
-    (handle-branch branch value (conj path id-k))))
+    (handle-branch branch value (conj path id-k) form)))
 
-;; Xử lý field kiểu multiselect (chọn nhiều lựa chọn)
-;; Tham số: field - thông tin field (id, label, options, branch), path - đường dẫn
-;; Trả về: không có (side effect - cập nhật answers và xử lý branch cho từng lựa chọn)
-(defmethod ask-field :multiselect [{:keys [id label options branch]} path]
+(defmethod ask-field :multiselect [{:keys [id label options branch]} path form]
   (let [id-k (keyword id)
         raw (if (should-skip? id path)
               (get-prefilled id path)
@@ -252,7 +292,7 @@
                   :else [])]
     (swap! answers update-in path #(assoc (force-map %) id-k choices))
     (doseq [choice choices]
-      (handle-branch branch choice (conj path id-k)))))
+      (handle-branch branch choice (conj path id-k) form))))
 
 ;; -------------------------------
 ;; Entry point
@@ -262,10 +302,9 @@
 ;; Tham số: form - cấu trúc form chứa title, description và fields
 ;; Trả về: không có (side effect - hiển thị form)
 (defn run-form [form]
-  (println "\n📝" (:title form))
-  (println (:description form) "\n")
+  (render-header form)
   (doseq [field (:fields form)]
-    (ask-field field [:selectedByUser]))
+    (ask-field field [:selectedByUser] form))
   ;; Việc lưu file được xử lý trong run-form.clj
   )
 
