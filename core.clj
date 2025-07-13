@@ -27,16 +27,25 @@
   (-> v normalize-str str/trim str/lower-case))
 
 ;; Kiểm tra xem field có nên bỏ qua không (đã có giá trị prefilled)
-;; Tham số: id - id của field cần kiểm tra
+;; Tham số: id - id của field cần kiểm tra, path - đường dẫn hiện tại
 ;; Trả về: true nếu field đã có giá trị, false nếu chưa
-(defn should-skip? [id]
-  (contains? @answers (keyword id)))
+(defn should-skip? [id path]
+  (let [field-path (conj path (keyword id))
+        v (get-in @answers field-path)]
+    (println "DEBUG should-skip? id:" id "path:" path "field-path:" field-path "value:" v)
+    (or (and (map? v) (contains? v :_value))
+        (and (not (map? v)) (some? v)))))
 
 ;; Lấy giá trị đã được điền sẵn cho field
-;; Tham số: id - id của field cần lấy giá trị
+;; Tham số: id - id của field cần lấy giá trị, path - đường dẫn hiện tại
 ;; Trả về: giá trị đã được điền sẵn hoặc nil nếu không có
-(defn get-prefilled [id]
-  (get @answers (keyword id)))
+(defn get-prefilled [id path]
+  (let [field-path (conj path (keyword id))
+        v (get-in @answers field-path)]
+    (println "DEBUG get-prefilled id:" id "path:" path "field-path:" field-path "value:" v)
+    (if (map? v)
+      (:_value v)
+      v)))
 
 ;; Parse giá trị theo kiểu dữ liệu
 ;; Tham số: v - giá trị cần parse, type - kiểu dữ liệu ("number", "text", "date")
@@ -112,8 +121,8 @@
 ;; Trả về: không có (side effect - cập nhật answers và xử lý branch)
 (defmethod ask-field :text [{:keys [id label required branch]} path]
   (let [id-k (keyword id)
-        value (if (should-skip? id)
-                (get-prefilled id)
+        value (if (should-skip? id path)
+                (get-prefilled id path)
                 (gum-input label))]
     (when (or (not required) (not (str/blank? (str value))))
       (swap! answers update-in path #(assoc (force-map %) id-k (parse-value value "text"))))
@@ -124,8 +133,8 @@
 ;; Trả về: không có (side effect - cập nhật answers và xử lý branch)
 (defmethod ask-field :number [{:keys [id label required branch]} path]
   (let [id-k (keyword id)
-        value (if (should-skip? id)
-                (get-prefilled id)
+        value (if (should-skip? id path)
+                (get-prefilled id path)
                 (loop []
                   (let [v (gum-input label)]
                     (if (or (not required)
@@ -140,8 +149,8 @@
 ;; Trả về: không có (side effect - cập nhật answers và xử lý branch)
 (defmethod ask-field :date [{:keys [id label required branch]} path]
   (let [id-k (keyword id)
-        value (if (should-skip? id)
-                (get-prefilled id)
+        value (if (should-skip? id path)
+                (get-prefilled id path)
                 (gum-input (str label " (YYYY-MM-DD)")))]
     (when (or (not required) (not (str/blank? value)))
       (swap! answers update-in path #(assoc (force-map %) id-k (parse-value value "date"))))
@@ -152,8 +161,8 @@
 ;; Trả về: không có (side effect - cập nhật answers và xử lý branch)
 (defmethod ask-field :select [{:keys [id label options branch]} path]
   (let [id-k (keyword id)
-        value (if (should-skip? id)
-                (get-prefilled id)
+        value (if (should-skip? id path)
+                (get-prefilled id path)
                 (gum-select label options))]
     (swap! answers update-in path #(assoc (force-map %) id-k value))
     (handle-branch branch value (conj path id-k))))
@@ -163,8 +172,8 @@
 ;; Trả về: không có (side effect - cập nhật answers và xử lý branch cho từng lựa chọn)
 (defmethod ask-field :multiselect [{:keys [id label options branch]} path]
   (let [id-k (keyword id)
-        raw (if (should-skip? id)
-              (get-prefilled id)
+        raw (if (should-skip? id path)
+              (get-prefilled id path)
               (gum-multiselect label options))
         choices (cond
                   (string? raw) [raw]
@@ -182,7 +191,6 @@
 ;; Tham số: form - cấu trúc form chứa title, description và fields
 ;; Trả về: không có (side effect - hiển thị form, lưu kết quả vào result.json)
 (defn run-form [form]
-  (reset! answers {})
   (println "\n📝" (:title form))
   (println (:description form) "\n")
   (doseq [field (:fields form)]

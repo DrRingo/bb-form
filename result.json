@@ -1,28 +1,15 @@
 {
   "selectedByUser" : {
+    "age" : 32,
+    "symptoms" : [ "Sốt" ],
     "name" : "ringo",
-    "age" : 23,
-    "gender" : "Nữ",
-    "gender_branch" : {
-      "Nữ" : {
-        "is_pregnant" : "Có",
-        "is_pregnant_branch" : {
-          "Có" : {
-            "gestational_age" : 23
-          }
-        }
-      }
-    },
-    "symptoms" : [ "Sốt", "Ho", "Khó thở", "Mệt mỏi", "Không có" ],
+    "gender" : "Nam",
     "symptoms_branch" : {
       "Sốt" : {
-        "temperature" : 323
-      },
-      "Khó thở" : {
-        "breath_level" : "Vừa"
+        "temperature" : 32
       }
     },
-    "exam_date" : "lfsj",
-    "notes" : "flksj"
+    "exam_date" : "flskj",
+    "notes" : "lfj"
   }
 }

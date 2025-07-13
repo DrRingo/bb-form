@@ -35,11 +35,13 @@
         json-values (if values-file
                       (json/parse-string (slurp values-file) true)
                       {})
-        prefilled (into {} (filter (fn [[k v]] (map? v)) (merge json-values kv-values)))]
+        prefilled (merge json-values kv-values)]
     (if-not form-file
       (do (println "❌ Vui lòng nhập đường dẫn tới form.json") (System/exit 1))
       (let [form (json/parse-string (slurp (io/file form-file)) true)]
-        (swap! form.core/answers merge prefilled)
+        ;; Khởi tạo atom với :selectedByUser là map rỗng, sau đó merge prefilled
+        (reset! form.core/answers {:selectedByUser {}})
+        (swap! form.core/answers update :selectedByUser merge prefilled)
         (form.core/run-form form)
         (spit "result.json" (json/generate-string @form.core/answers {:pretty true}))
         (println "\n💾 Đã lưu kết quả vào result.json")))))
