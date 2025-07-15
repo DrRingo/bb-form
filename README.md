@@ -7,6 +7,19 @@ Script sử dụng Clojure Babashka và Charm-gum để thu thập dữ liệu t
 - [Clojure babashka](https://babashka.org/)
 - [Charm-gum](https://github.com/charmbracelet/gum)
 
+# Cài đặt nhanh với bbin
+
+Nếu đã cài [bbin](https://github.com/babashka/bbin):
+
+```bash
+bbin install github:drringo/bb-form
+```
+
+Sau đó bạn có thể chạy lệnh (giả sử bạn đặt tên là `bb-form`):
+```bash
+bb-form form.json [--values values.json] [--out output.json] [field1:value1 ...]
+```
+
 # Tính năng giao diện người dùng
 
 ## Màn hình sạch sẽ
@@ -27,15 +40,19 @@ Script sử dụng Clojure Babashka và Charm-gum để thu thập dữ liệu t
 
 # Giải thích các file
 
-- `core.clj` :: File Clojure chính chứa các hàm xử lý form và giao diện người dùng
-- `run-form.clj` :: File chạy script với các tùy chọn command line
+- `src/com/drbinhthanh/bb_form.clj` :: File Clojure chính chứa toàn bộ logic xử lý form và giao diện người dùng
+- `bb.edn` :: File cấu hình cho bbin/babashka
 - `form.json` :: File cấu hình form, hỗ trợ câu hỏi phân nhánh
 - `values.json` :: File chứa giá trị mặc định cho form
 - `result.json` :: File kết quả sau khi điền form trong terminal
 
-# Hướng dẫn sử dụng
+# Hướng dẫn sử dụng thủ công (không qua bbin)
 
-## Hướng dẫn tạo file `form.json`
+```bash
+bb src/com/drbinhthanh/bb_form.clj form.json [--values values.json] [--out output.json] [field1:value1 ...]
+```
+
+# Hướng dẫn tạo file `form.json`
 
 ### Cấu trúc cơ bản:
 ```json
@@ -109,33 +126,6 @@ Script sử dụng Clojure Babashka và Charm-gum để thu thập dữ liệu t
 - Cho phép hiển thị field con dựa trên lựa chọn của field cha
 - Hỗ trợ nhiều cấp độ phân nhánh
 - Tự động ẩn/hiện field dựa trên logic
-
-## Cách chạy script
-
-### Chạy cơ bản:
-```bash
-bb run-form.clj form.json
-```
-
-### Chạy với giá trị mặc định:
-```bash
-bb run-form.clj form.json --values values.json
-```
-
-### Chạy với tham số command line:
-```bash
-bb run-form.clj form.json field1:value1 field2:value2
-```
-
-### Chạy với tùy chọn xuất file tùy chỉnh:
-```bash
-bb run-form.clj form.json --out path/myfilename.json
-```
-
-### Kết hợp các tùy chọn:
-```bash
-bb run-form.clj form.json --values values.json --out output.json field1:value1
-```
 
 ## File kết quả
 

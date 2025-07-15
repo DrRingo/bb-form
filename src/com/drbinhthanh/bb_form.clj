@@ -1,8 +1,8 @@
-;; File: core.clj
-(ns form.core
+(ns com.drbinhthanh.bb-form
   (:require [babashka.process :refer [shell]]
-            [clojure.string :as str]
-            [cheshire.core :as json]))
+            [cheshire.core :as json]
+            [clojure.java.io :as io]
+            [clojure.string :as str]))
 
 ;; Atom để lưu trữ tất cả câu trả lời của form
 (def answers (atom {}))
@@ -56,45 +56,28 @@
 ;; Utility functions
 ;; -------------------------------
 
-;; Chuyển đổi giá trị thành chuỗi
-;; Tham số: v - giá trị cần chuyển đổi (có thể là keyword, symbol hoặc giá trị khác)
-;; Trả về: chuỗi đã được chuyển đổi
 (defn normalize-str [v]
   (cond
     (keyword? v) (name v)
     (symbol? v)  (name v)
     :else (str v)))
 
-;; Chuẩn hóa key cho branching logic
-;; Tham số: v - giá trị cần chuẩn hóa
-;; Trả về: chuỗi đã được trim, chuyển thành lowercase
 (defn normalize-branch-key [v]
   (-> v normalize-str str/trim str/lower-case))
 
-;; Kiểm tra xem field có nên bỏ qua không (đã có giá trị prefilled)
-;; Tham số: id - id của field cần kiểm tra, path - đường dẫn hiện tại
-;; Trả về: true nếu field đã có giá trị, false nếu chưa
 (defn should-skip? [id path]
   (let [field-path (conj path (keyword id))
         v (get-in @answers field-path)]
-    ;; (println "DEBUG should-skip? id:" id "path:" path "field-path:" field-path "value:" v)
     (or (and (map? v) (contains? v :_value))
         (and (not (map? v)) (some? v)))))
 
-;; Lấy giá trị đã được điền sẵn cho field
-;; Tham số: id - id của field cần lấy giá trị, path - đường dẫn hiện tại
-;; Trả về: giá trị đã được điền sẵn hoặc nil nếu không có
 (defn get-prefilled [id path]
   (let [field-path (conj path (keyword id))
         v (get-in @answers field-path)]
-    ;; (println "DEBUG get-prefilled id:" id "path:" path "field-path:" field-path "value:" v)
     (if (map? v)
       (:_value v)
       v)))
 
-;; Parse giá trị theo kiểu dữ liệu
-;; Tham số: v - giá trị cần parse, type - kiểu dữ liệu ("number", "text", "date")
-;; Trả về: giá trị đã được parse theo đúng kiểu dữ liệu
 (defn parse-value [v type]
   (case type
     "number" (try (Integer/parseInt (str v)) (catch Exception _ v))
@@ -108,47 +91,30 @@
                    s))
     v))
 
-;; Lấy ngày hôm nay theo định dạng DD-MM-YYYY
-;; Trả về: chuỗi ngày hôm nay
 (defn today []
   (let [now (java.time.LocalDate/now)]
     (.format now (java.time.format.DateTimeFormatter/ofPattern "dd-MM-yyyy"))))
 
-;; Lấy tháng và năm hiện tại
-;; Trả về: map với :month và :year
 (defn current-month-year []
   (let [now (java.time.LocalDate/now)]
     {:month (.getMonthValue now)
      :year (.getYear now)}))
 
-;; Xử lý gõ tắt cho ngày tháng
-;; Tham số: input - chuỗi người dùng nhập
-;; Trả về: chuỗi ngày tháng đầy đủ DD-MM-YYYY
 (defn expand-date-shortcut [input]
   (let [trimmed (str/trim input)
         {:keys [month year]} (current-month-year)]
     (cond
-      ;; Gõ 2 chữ số: dd (lấy tháng và năm hiện tại)
       (re-matches #"^\d{2}$" trimmed)
       (let [dd (Integer/parseInt trimmed)]
         (format "%02d-%02d-%d" dd month year))
-      
-      ;; Gõ 4 chữ số: ddmm (lấy năm hiện tại)
       (re-matches #"^\d{4}$" trimmed)
       (let [dd (Integer/parseInt (subs trimmed 0 2))
             mm (Integer/parseInt (subs trimmed 2 4))]
         (format "%02d-%02d-%d" dd mm year))
-      
-      ;; Gõ đầy đủ DD-MM-YYYY hoặc DD/MM/YYYY
       (re-matches #"^\d{2}[-/]\d{2}[-/]\d{4}$" trimmed)
       (str/replace trimmed #"[/]" "-")
-      
-      ;; Các trường hợp khác, giữ nguyên
       :else trimmed)))
 
-;; Kiểm tra tính hợp lệ của ngày tháng
-;; Tham số: date-str - chuỗi ngày tháng theo định dạng DD-MM-YYYY
-;; Trả về: true nếu ngày tháng hợp lệ, false nếu không
 (defn valid-date? [date-str]
   (if-let [[_ dd mm yyyy] (re-matches #"^(\d{2})-(\d{2})-(\d{4})$" date-str)]
     (let [d (Integer/parseInt dd)
@@ -162,7 +128,6 @@
       (and (<= 1 d max-day)))
     false))
 
-;; Helper ép kiểu về map nếu không phải map
 (defn force-map [v]
   (cond
     (map? v) v
@@ -175,33 +140,21 @@
 ;; GUM UI
 ;; -------------------------------
 
-;; Xóa dòng hiện tại và dòng trước đó
 (defn clear-error-lines []
-  (print "\033[2K")  ;; Xóa dòng hiện tại
-  (print "\033[1A")  ;; Di chuyển lên 1 dòng
-  (print "\033[2K")  ;; Xóa dòng đó
+  (print "\033[2K")
+  (print "\033[1A")
+  (print "\033[2K")
   (flush))
 
-
-
-;; Hiển thị input text với GUM
-;; Tham số: label - nhãn hiển thị cho input
-;; Trả về: chuỗi người dùng nhập vào
 (defn gum-input [label]
   (-> (shell {:out :string} "gum" "input" "--placeholder" label)
       :out str/trim))
 
-;; Hiển thị dropdown select với GUM
-;; Tham số: label - nhãn hiển thị, options - danh sách các lựa chọn
-;; Trả về: lựa chọn được chọn (một chuỗi)
 (defn gum-select [label options]
   (-> (apply shell {:out :string}
              (concat ["gum" "choose" "--header" label] options))
       :out str/trim))
 
-;; Hiển thị multiselect với GUM
-;; Tham số: label - nhãn hiển thị, options - danh sách các lựa chọn
-;; Trả về: danh sách các lựa chọn được chọn (vector)
 (defn gum-multiselect [label options]
   (-> (apply shell {:out :string}
              (concat ["gum" "choose" "--no-limit" "--header" label] options))
@@ -211,14 +164,8 @@
 ;; Field handling
 ;; -------------------------------
 
-;; Multimethod để xử lý các loại field khác nhau
-;; Tham số: field - thông tin field, path - đường dẫn trong cấu trúc dữ liệu
-;; Trả về: không có (side effect - cập nhật atom answers)
 (defmulti ask-field (fn [field & _] (keyword (:type field))))
 
-;; Xử lý branching logic - hiển thị field con dựa trên lựa chọn
-;; Tham số: branch - map chứa các nhánh, value - giá trị được chọn, path - đường dẫn hiện tại
-;; Trả về: không có (side effect - gọi ask-field cho các field con)
 (defn handle-branch [branch value path form]
   (let [raw-key (str/trim (str value))
         norm-key (normalize-branch-key value)
@@ -230,7 +177,6 @@
               branch-path (conj (pop path) branch-key (keyword raw-key))]
           (ask-field sub branch-path form))))))
 
-;; Sửa các hàm validation để chỉ cập nhật status-line
 (defmethod ask-field :text [{:keys [id label required branch regex regexError]} path form]
   (let [id-k (keyword id)
         value (if (should-skip? id path)
@@ -300,15 +246,64 @@
 ;; Entry point
 ;; -------------------------------
 
-;; Hàm chính để chạy form
-;; Tham số: form - cấu trúc form chứa title, description và fields
-;; Trả về: không có (side effect - hiển thị form)
 (defn run-form [form]
-  (clear-screen)  ;; Clear màn hình trước khi hiển thị form
+  (clear-screen)
   (render-header form)
   (doseq [field (:fields form)]
-    (ask-field field [:selectedByUser] form))
-  ;; Việc lưu file được xử lý trong run-form.clj
-  )
+    (ask-field field [:selectedByUser] form)))
 
+;; -------------------------------
+;; CLI entry point (from run-form.clj)
+;; -------------------------------
 
+(defn parse-kv-args [args]
+  (->> args
+       (filter #(str/includes? % ":"))
+       (map #(str/split % #":" 2))
+       (map (fn [[k v]] [(keyword k) v]))
+       (into {})))
+
+(defn parse-options [args]
+  (loop [args args
+         opts {}]
+    (if (empty? args)
+      opts
+      (let [[k & rest] args]
+        (cond
+          (= k "--values")
+          (recur (drop 1 rest)
+                 (assoc opts :values-file (first rest)))
+
+          (= k "--out")
+          (recur (drop 1 rest)
+                 (assoc opts :output-file (first rest)))
+
+          :else
+          (recur rest
+                 (update opts :kv-args (fnil conj []) k)))))))
+
+(defn -main [& args]
+  (let [[form-file & args] args
+        {:keys [values-file kv-args output-file]} (parse-options args)
+        kv-values (parse-kv-args kv-args)
+        json-values (if values-file
+                      (json/parse-string (slurp values-file) true)
+                      {})
+        prefilled (merge json-values kv-values)
+        output-path (or output-file "result.json")]
+    (if-not form-file
+      (do (println "❌ Vui lòng nhập đường dẫn tới form.json") (System/exit 1))
+      (let [form (json/parse-string (slurp (io/file form-file)) true)]
+        ;; Khởi tạo atom với :selectedByUser là map rỗng, sau đó merge prefilled
+        (reset! answers {:selectedByUser {}})
+        (swap! answers update :selectedByUser merge prefilled)
+        (run-form form)
+        ;; Tạo thư mục nếu chưa tồn tại (chỉ khi có path)
+        (let [output-file (io/file output-path)
+              parent-dir (.getParentFile output-file)]
+          (when parent-dir
+            (.mkdirs parent-dir)))
+        (spit output-path (json/generate-string @answers {:pretty true}))
+        (println (str "\n💾 Đã lưu kết quả vào " output-path))))))
+
+(apply -main *command-line-args*) 
