@@ -1,12 +1,12 @@
 {
   "selectedByUser" : {
-    "email" : "ringo@fjslj.fjl",
-    "phone" : "12348938492",
-    "username" : "fjsj",
-    "age" : 21,
-    "gender" : "Khác",
-    "symptoms" : [ ],
-    "exam_date" : "2025-11-23",
-    "notes" : "fjsljfaljcvn"
+    "age" : 32,
+    "symptoms" : "Sốt",
+    "gender" : "Nữ",
+    "gender_branch" : {
+      "Nữ" : {
+        "is_pregnant" : "Có"
+      }
+    }
   }
 }

@@ -1,4 +1,6 @@
-{:deps {cheshire/cheshire {:mvn/version "5.11.0"}
+{:deps {io.github.drringo/bb-form {:local/root "."}
+        cheshire/cheshire {:mvn/version "5.11.0"}
         babashka/process {:mvn/version "0.5.22"}}
- 
+ :paths [".","src"] 
  :bbin/bin {bb-form {:main-opts ["-m" "com.drbinhthanh.bb-form"]}}}
+
