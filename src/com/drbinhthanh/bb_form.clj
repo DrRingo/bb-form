@@ -375,5 +375,5 @@
         (println (str "\n💾 Đã lưu kết quả vào " output-path))))))
 
 ;; Gọi hàm main với command line arguments
-(let [args *command-line-args*]
-  (apply -main args)) 
+(when (= *file* (System/getProperty "babashka.file"))
+  (apply -main *command-line-args*)) 
