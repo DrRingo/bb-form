@@ -13,7 +13,7 @@ Nếu đã cài [bbin](https://github.com/babashka/bbin):
 
 ```bash
 # Cài đặt từ GitHub
-bbin install github:drringo/bb-form
+bbin install io.github.drringo/bb-form
 
 # Hoặc cài đặt từ thư mục local (nếu đang phát triển)
 bbin install .

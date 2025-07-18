@@ -15,7 +15,7 @@ If you have [bbin](https://github.com/babashka/bbin) installed:
 
 ```bash
 # Install from GitHub
-bbin install github:drringo/bb-form
+bbin install io.github.drringo/bb-form
 
 # Or install from local folder (for development)
 bbin install .
