@@ -23,7 +23,7 @@ bbin install .
 
 Then you can run:
 ```bash
-bb-form form.json [--values values.json] [--out output.json] [field1:value1 ...]
+bb-form form.json [--values values.json] [--out output.json] [--org output.org] [field1:value1 ...]
 ```
 
 # User Interface Features
@@ -72,7 +72,7 @@ The `bb.edn` file is configured for bbin compatibility:
 # Manual Usage (without bbin)
 
 ```bash
-bb src/com/drbinhthanh/bb_form.clj form.json [--values values.json] [--out output.json] [field1:value1 ...]
+bb src/com/drbinhthanh/bb_form.clj form.json [--values values.json] [--out output.json] [--org output.org] [field1:value1 ...]
 ```
 
 ## Usage Examples
@@ -87,8 +87,14 @@ bb-form form_sample.json --values values.json
 # Form with custom output file
 bb-form form_sample.json --out my_result.json
 
+# Form with Org-mode export
+bb-form form_sample.json --org result.org
+
 # Form with both values and output
 bb-form form_sample.json --values values.json --out custom_output.json
+
+# Form with values, output and org
+bb-form form_sample.json --values values.json --out custom_output.json --org result.org
 
 # Form with values from command line
 bb-form form_sample.json name:"Nguyen Van A" age:25

@@ -21,7 +21,7 @@ bbin install .
 
 Sau đó bạn có thể chạy lệnh:
 ```bash
-bb-form form.json [--values values.json] [--out output.json] [field1:value1 ...]
+bb-form form.json [--values values.json] [--out output.json] [--org output.org] [field1:value1 ...]
 ```
 
 # Tính năng giao diện người dùng
@@ -70,7 +70,7 @@ File `bb.edn` được cấu hình để tương thích với bbin:
 # Hướng dẫn sử dụng thủ công (không qua bbin)
 
 ```bash
-bb src/com/drbinhthanh/bb_form.clj form.json [--values values.json] [--out output.json] [field1:value1 ...]
+bb src/com/drbinhthanh/bb_form.clj form.json [--values values.json] [--out output.json] [--org output.org] [field1:value1 ...]
 ```
 
 ## Ví dụ sử dụng
@@ -85,8 +85,14 @@ bb-form form_sample.json --values values.json
 # Chạy form với output file tùy chỉnh
 bb-form form_sample.json --out my_result.json
 
+# Chạy form xuất ra Org-mode
+bb-form form_sample.json --org result.org
+
 # Chạy form với cả values và output
 bb-form form_sample.json --values values.json --out custom_output.json
+
+# Chạy form với values, output và org
+bb-form form_sample.json --values values.json --out custom_output.json --org result.org
 
 # Chạy form với giá trị từ command line
 bb-form form_sample.json name:"Nguyễn Văn A" age:25

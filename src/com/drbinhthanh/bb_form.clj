@@ -2,7 +2,8 @@
   (:require [babashka.process :refer [shell]]
             [cheshire.core :as json]
             [clojure.java.io :as io]
-            [clojure.string :as str]))
+            [clojure.string :as str]
+            [org-crud.core :as org]))
 
 ;; Atom để lưu trữ tất cả câu trả lời của form
 (def answers (atom {}))
@@ -296,6 +297,23 @@
     (ask-field field [:selectedByUser] form)))
 
 ;; -------------------------------
+;; Org export
+;; -------------------------------
+
+(defn- value->prop [v]
+  (if (or (map? v) (sequential? v))
+    (json/generate-string v)
+    (str v)))
+
+(defn export-to-org [org-path data]
+  (let [props (into {} (map (fn [[k v]] [(name k) (value->prop v)]) data))
+        node {:title "Form Result"
+              :level 1
+              :properties props}
+        content (org/nodes->string [node])]
+    (spit org-path (str content "\n") :append true)))
+
+;; -------------------------------
 ;; CLI entry point (from run-form.clj)
 ;; -------------------------------
 
@@ -307,7 +325,7 @@
        (map (fn [[k v]] [(keyword k) v]))
        (into {})))
 
-;; Hàm parse các options từ command line (--values, --out)
+;; Hàm parse các options từ command line (--values, --out, --org)
 (defn parse-options [args]
   (loop [args args
          opts {}]
@@ -329,6 +347,13 @@
             (recur (drop 1 rest)
                    (assoc opts :output-file (first rest))))
 
+          ;; Parse option --org
+          (= k "--org")
+          (if (empty? rest)
+            (do (println "❌ Thiếu file org sau --org") (System/exit 1))
+            (recur (drop 1 rest)
+                   (assoc opts :org-file (first rest))))
+
           ;; Bỏ qua các argument không phải option
           (str/starts-with? k "--")
           (do (println (str "❌ Option không được hỗ trợ: " k)) (System/exit 1))
@@ -344,7 +369,7 @@
                                    (not (str/includes? % ":"))
                                    (str/ends-with? % ".json")) args))
         ;; Parse options từ tất cả arguments
-        {:keys [values-file kv-args output-file]} (parse-options args)
+        {:keys [values-file kv-args output-file org-file]} (parse-options args)
         kv-values (parse-kv-args kv-args)
         ;; Load giá trị mặc định từ file JSON nếu có
         json-values (if values-file
@@ -352,7 +377,8 @@
                       {})
         ;; Merge các giá trị từ command line và file JSON
         prefilled (merge json-values kv-values)
-        output-path (or output-file "result.json")]
+        output-path (or output-file "result.json")
+        org-path org-file]
     
     ;; Kiểm tra xem có file form không
     (if-not form-file
@@ -365,14 +391,22 @@
         (swap! answers update :selectedByUser merge prefilled)
         ;; Chạy form
         (run-form form)
-        ;; Tạo thư mục nếu chưa tồn tại (chỉ khi có path)
+        ;; Tạo thư mục nếu chưa tồn tại cho các file xuất
         (let [output-file (io/file output-path)
               parent-dir (.getParentFile output-file)]
           (when parent-dir
             (.mkdirs parent-dir)))
+        (when org-path
+          (let [org-file (io/file org-path)
+                org-parent (.getParentFile org-file)]
+            (when org-parent (.mkdirs org-parent))))
         ;; Lưu kết quả ra file JSON
         (spit output-path (json/generate-string @answers {:pretty true}))
-        (println (str "\n💾 Đã lưu kết quả vào " output-path))))))
+        (println (str "\n💾 Đã lưu kết quả vào " output-path))
+        ;; Xuất ra file org nếu được yêu cầu
+        (when org-path
+          (export-to-org org-path (:selectedByUser @answers))
+          (println (str "📝 Đã ghi kết quả vào " org-path)))))))
 
 ;; Gọi hàm main với command line arguments
 (when (= *file* (System/getProperty "babashka.file"))

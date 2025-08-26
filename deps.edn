@@ -1,2 +1,3 @@
 {:deps {cheshire/cheshire {:mvn/version "5.11.0"}
-        babashka/process {:mvn/version "0.5.22"}}} 
+        babashka/process {:mvn/version "0.5.22"}
+        org-crud/org-crud {:mvn/version "0.3.2"}}}
