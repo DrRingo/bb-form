@@ -7,14 +7,29 @@
   "hash": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
   "bin": "bb-form.bat",
   "depends": [
-    "babashka",
-    "extras/gum"
+    "babashka"
   ],
-  "suggest": {
-    "gum (nếu không có trong extras)": {
-      "description": "Nếu gum chưa được cài, hãy chạy: scoop bucket add extras && scoop install gum"
-    }
-  },
+  "post_install": [
+    "# Kiểm tra gum đã cài chưa",
+    "if (-not (Get-Command gum -ErrorAction SilentlyContinue)) {",
+    "  Write-Host '' ",
+    "  Write-Host '⚠️  bb-form cần Charm Gum để hiển thị UI terminal.' -ForegroundColor Yellow",
+    "  Write-Host '   Hãy cài gum bằng một trong các cách sau:' -ForegroundColor Yellow",
+    "  Write-Host ''",
+    "  Write-Host '   1) winget (khuyên dùng):' -ForegroundColor Cyan",
+    "  Write-Host '      winget install charmbracelet.gum' -ForegroundColor White",
+    "  Write-Host ''",
+    "  Write-Host '   2) Tải trực tiếp từ GitHub Releases:' -ForegroundColor Cyan",
+    "  Write-Host '      https://github.com/charmbracelet/gum/releases' -ForegroundColor White",
+    "  Write-Host ''",
+    "  Write-Host '   3) Go (nếu đã cài Go):' -ForegroundColor Cyan",
+    "  Write-Host '      go install github.com/charmbracelet/gum@latest' -ForegroundColor White",
+    "  Write-Host ''",
+    "} else {",
+    "  $gumVer = (gum --version 2>&1) -replace 'gum version ',''",
+    "  Write-Host \"✅ gum $gumVer đã sẵn sàng.\" -ForegroundColor Green",
+    "}"
+  ],
   "checkver": {
     "github": "https://github.com/drringo/bb-form"
   },
@@ -26,9 +41,13 @@
     }
   },
   "notes": [
-    "bb-form đã được cài đặt thành công!",
-    "Yêu cầu: babashka và gum phải có trong PATH.",
-    "Nếu gum chưa được cài: scoop bucket add extras && scoop install gum",
+    "bb-form đã được cài đặt!",
+    "",
+    "⚠️  Nếu chưa cài gum, hãy chạy:",
+    "    winget install charmbracelet.gum",
+    "    hoặc tải từ: https://github.com/charmbracelet/gum/releases",
+    "",
     "Dùng thử: bb-form form_sample.json"
   ]
 }
+

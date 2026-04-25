@@ -29,15 +29,17 @@ brew upgrade bb-form
 ## Scoop (Windows)
 
 ```powershell
-# Add the bucket (only needed once)
+# 1. Cài gum trước (không có trong Scoop, dùng winget)
+winget install charmbracelet.gum
+
+# 2. Thêm bb-form bucket (chỉ cần làm một lần)
 scoop bucket add drringo https://github.com/drringo/bb-form
 
-# If gum is not yet in your scoop, add the extras bucket first
-scoop bucket add extras
-
-# Install bb-form (babashka and gum will be installed as dependencies)
+# 3. Cài bb-form (babashka sẽ được cài tự động)
 scoop install bb-form
 ```
+
+> **Note:** `gum` is not available in any Scoop bucket. Install it via `winget install charmbracelet.gum` or download from [GitHub Releases](https://github.com/charmbracelet/gum/releases).
 
 To update:
 ```powershell
