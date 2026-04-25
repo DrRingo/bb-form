@@ -3,8 +3,8 @@
   "description": "Terminal form UI tool — thu thập dữ liệu qua form đẹp trên terminal (Babashka + Charm Gum)",
   "homepage": "https://github.com/drringo/bb-form",
   "license": "Apache-2.0",
-  "url": "https://github.com/drringo/bb-form/releases/download/v0.1.0/bb-form-windows-x86_64.zip",
-  "hash": "sha256:1fa67e87c03bc5b9c8e90c479fac2a7443679060cff9825643f608135b7e32fe",
+  "url": "file:///C:/Users/USER/Dropbox/commonShare/myGeekSpace/share/public/bb-form/release/bb-form-windows-x86_64.zip",
+  "hash": "sha256:180ce79efcd802fd0839b9e38ebb1ceacc94c2aa71dfa3366dfe156306c2b542",
   "bin": "bb-form.bat",
   "depends": [
     "babashka"

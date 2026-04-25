@@ -1,19 +1,6 @@
 {:deps {io.github.drringo/bb-form {:local/root "."}
         cheshire/cheshire {:mvn/version "5.11.0"}
         babashka/process {:mvn/version "0.5.22"}}
- :paths [".", "src"]
- :bbin/bin {bb-form {:main-opts ["-m" "com.drbinhthanh.bb-form"]}}
- :tasks {build     {:doc  "Build uberscript vào dist/bb-form.clj"
-                    :task (do
-                            (println "📦 Building uberscript...")
-                            (clojure.java.io/make-parents "dist/bb-form.clj")
-                            (shell "bb" "uberscript" "dist/bb-form.clj" "-m" "com.drbinhthanh.bb-form")
-                            (println "✅ Done → dist/bb-form.clj"))}
-
-          package   {:doc     "Tạo package ZIP/tar.gz cho mọi nền tảng"
-                     :depends [build]
-                     :task    (shell "bash" "scripts/build.sh")}
-
-          release   {:doc  "Build + package + upload GitHub Release (cần GH_TOKEN)"
-                     :task (shell "bash" "scripts/release.sh")}}}
+ :paths [".","src"] 
+ :bbin/bin {bb-form {:main-opts ["-m" "com.drbinhthanh.bb-form"]}}}
 
