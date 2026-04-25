@@ -18,10 +18,10 @@ class BbForm < Formula
   on_macos do
     if Hardware::CPU.arm?
       url "https://github.com/drringo/bb-form/releases/download/v#{version}/bb-form-macos-arm64.tar.gz"
-      sha256 "0000000000000000000000000000000000000000000000000000000000000000"
+      sha256 "4cf2e02a57a701f756ff0c5a793746e9ebf2d7a252efa700e1659885423b67dd"
     else
       url "https://github.com/drringo/bb-form/releases/download/v#{version}/bb-form-macos-x86_64.tar.gz"
-      sha256 "0000000000000000000000000000000000000000000000000000000000000000"
+      sha256 "4cf2e02a57a701f756ff0c5a793746e9ebf2d7a252efa700e1659885423b67dd"
     end
   end
 
@@ -30,7 +30,7 @@ class BbForm < Formula
   # ──────────────────────────────────────────────
   on_linux do
     url "https://github.com/drringo/bb-form/releases/download/v#{version}/bb-form-linux-x86_64.tar.gz"
-    sha256 "0000000000000000000000000000000000000000000000000000000000000000"
+    sha256 "4cf2e02a57a701f756ff0c5a793746e9ebf2d7a252efa700e1659885423b67dd"
   end
 
   # ──────────────────────────────────────────────
