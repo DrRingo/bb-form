@@ -1,0 +1,33 @@
+#+TITLE: Ghi chú trong ~bb-form~
+#+AUTHOR: Ringo Stark
+#+DATE: \today
+#+COMMENT: 
+
+#+SETUPFILE: "./assets/latex/report-main.org"
+
+# Macro section
+#+SETUPFILE: "./assets/latex/common-macro.org"
+
+#+DESCRIPTION: 
+#+KEYWORDS: 
+#+LANGUAGE: vi
+
+#+EXCLUDE_TAGS: noexport
+
+* Issues
+:PROPERTIES:
+:CREATED: [2025-07-24 Thu 09:23]
+:END:
+
+* IDEA Các ý tưởng trong bb-form
+:PROPERTIES:
+:CREATED: [2025-07-15 Tue 16:31]
+:END:
+
+
+- [ ] Thêm dạng field yesno, là select nhưng giao diện đẹp hơn
+- [ ] Thêm field dạng file, để tương thích với json, nó đơn thuần là đường link dẫn tới file (như vậy sẽ có 2 dạng, local file và online resource)
+- [X] Làm tương thích với bbin
+- [X] Làm file bb.edn
+- [ ] Thêm miền condition, tức là dạng boolean để câu hỏi có thể hiện lên. Một loại phân nhánh phức tạp. Khi làm chức năng này cần phải cover luôn cách gọi ra khi xử lý json.
+- [ ] Mode roullett, tức là khi nhập xong, thay vì thoát, chương trình sẽ nhập lại tiếp và đánh số tiến cho file output.

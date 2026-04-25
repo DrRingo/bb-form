@@ -6,10 +6,45 @@ A script using Clojure Babashka and Charm-gum to collect data from beautiful for
 
 # System Requirements
 
-- [Clojure babashka](https://babashka.org/)
-- [Charm-gum](https://github.com/charmbracelet/gum)
+- [Clojure Babashka](https://babashka.org/) — can be installed automatically via Homebrew / Scoop
+- [Charm Gum](https://github.com/charmbracelet/gum) — can be installed automatically via Homebrew / Scoop
 
-# Quick Install with bbin
+# Installation
+
+## Homebrew (macOS / Linux)
+
+```bash
+# Add the tap (only needed once)
+brew tap drringo/bb-form https://github.com/drringo/bb-form
+
+# Install bb-form (babashka and gum will be installed automatically if missing)
+brew install bb-form
+```
+
+To update:
+```bash
+brew upgrade bb-form
+```
+
+## Scoop (Windows)
+
+```powershell
+# Add the bucket (only needed once)
+scoop bucket add drringo https://github.com/drringo/bb-form
+
+# If gum is not yet in your scoop, add the extras bucket first
+scoop bucket add extras
+
+# Install bb-form (babashka and gum will be installed as dependencies)
+scoop install bb-form
+```
+
+To update:
+```powershell
+scoop update bb-form
+```
+
+## Install via bbin (for Babashka developers)
 
 If you have [bbin](https://github.com/babashka/bbin) installed:
 
@@ -25,6 +60,19 @@ Then you can run:
 ```bash
 bb-form form.json [--values values.json] [--out output.json] [field1:value1 ...]
 ```
+
+## Manual Download
+
+Download the pre-built archive for your platform from the [Releases page](https://github.com/drringo/bb-form/releases):
+
+| Platform | File |
+|---|---|
+| Linux x86_64 | `bb-form-linux-x86_64.tar.gz` |
+| macOS x86_64 (Intel) | `bb-form-macos-x86_64.tar.gz` |
+| macOS arm64 (Apple Silicon) | `bb-form-macos-arm64.tar.gz` |
+| Windows x86_64 | `bb-form-windows-x86_64.zip` |
+
+Extract and place `bb-form` (or `bb-form.bat` on Windows) in a directory on your `PATH`.
 
 # User Interface Features
 
@@ -47,7 +95,12 @@ bb-form form.json [--values values.json] [--out output.json] [field1:value1 ...]
 # File Explanation
 
 - `src/com/drbinhthanh/bb_form.clj`: Main Clojure file containing all form and UI logic
-- `bb.edn`: Config file for bbin/babashka, compatible with bbin
+- `bb.edn`: Config file for bbin/babashka (includes build tasks)
+- `Formula/bb-form.rb`: Homebrew formula for macOS/Linux installation
+- `bucket/bb-form.json`: Scoop manifest for Windows installation
+- `scripts/build.sh`: Unix build script — creates uberscript + platform packages
+- `scripts/build.ps1`: Windows build script (PowerShell)
+- `.github/workflows/release.yml`: GitHub Actions — auto-builds and publishes releases
 - `form.json`: Form config file, supports branching questions
 - `values.json`: File containing default values for the form
 - `result.json`: Output file after filling the form in the terminal

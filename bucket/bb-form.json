@@ -1,0 +1,34 @@
+{
+  "version": "0.1.0",
+  "description": "Terminal form UI tool — thu thập dữ liệu qua form đẹp trên terminal (Babashka + Charm Gum)",
+  "homepage": "https://github.com/drringo/bb-form",
+  "license": "Apache-2.0",
+  "url": "https://github.com/drringo/bb-form/releases/download/v0.1.0/bb-form-windows-x86_64.zip",
+  "hash": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+  "bin": "bb-form.bat",
+  "depends": [
+    "babashka",
+    "extras/gum"
+  ],
+  "suggest": {
+    "gum (nếu không có trong extras)": {
+      "description": "Nếu gum chưa được cài, hãy chạy: scoop bucket add extras && scoop install gum"
+    }
+  },
+  "checkver": {
+    "github": "https://github.com/drringo/bb-form"
+  },
+  "autoupdate": {
+    "url": "https://github.com/drringo/bb-form/releases/download/v$version/bb-form-windows-x86_64.zip",
+    "hash": {
+      "url": "https://github.com/drringo/bb-form/releases/download/v$version/checksums.txt",
+      "regex": "([a-fA-F0-9]+)\\s+bb-form-windows-x86_64\\.zip"
+    }
+  },
+  "notes": [
+    "bb-form đã được cài đặt thành công!",
+    "Yêu cầu: babashka và gum phải có trong PATH.",
+    "Nếu gum chưa được cài: scoop bucket add extras && scoop install gum",
+    "Dùng thử: bb-form form_sample.json"
+  ]
+}

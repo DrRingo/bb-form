@@ -4,10 +4,45 @@ Script sử dụng Clojure Babashka và Charm-gum để thu thập dữ liệu t
 
 # Yêu cầu hệ thống
 
-- [Clojure babashka](https://babashka.org/)
-- [Charm-gum](https://github.com/charmbracelet/gum)
+- [Clojure Babashka](https://babashka.org/) — có thể cài tự động qua Homebrew / Scoop
+- [Charm Gum](https://github.com/charmbracelet/gum) — có thể cài tự động qua Homebrew / Scoop
 
-# Cài đặt nhanh với bbin
+# Cài đặt
+
+## Homebrew (macOS / Linux)
+
+```bash
+# Thêm tap (chỉ cần làm một lần)
+brew tap drringo/bb-form https://github.com/drringo/bb-form
+
+# Cài đặt bb-form (babashka và gum sẽ được cài tự động nếu chưa có)
+brew install bb-form
+```
+
+Cập nhật lên phiên bản mới:
+```bash
+brew upgrade bb-form
+```
+
+## Scoop (Windows)
+
+```powershell
+# Thêm bucket (chỉ cần làm một lần)
+scoop bucket add drringo https://github.com/drringo/bb-form
+
+# Nếu chưa có extras bucket (để cài gum)
+scoop bucket add extras
+
+# Cài đặt bb-form (babashka và gum sẽ được cài là dependencies)
+scoop install bb-form
+```
+
+Cập nhật:
+```powershell
+scoop update bb-form
+```
+
+## Cài đặt bằng bbin (dành cho developer Babashka)
 
 Nếu đã cài [bbin](https://github.com/babashka/bbin):
 
@@ -23,6 +58,19 @@ Sau đó bạn có thể chạy lệnh:
 ```bash
 bb-form form.json [--values values.json] [--out output.json] [field1:value1 ...]
 ```
+
+## Tải thủ công
+
+Tải file phù hợp với nền tảng của bạn từ [trang Releases](https://github.com/drringo/bb-form/releases):
+
+| Nền tảng | File |
+|---|---|
+| Linux x86_64 | `bb-form-linux-x86_64.tar.gz` |
+| macOS x86_64 (Intel) | `bb-form-macos-x86_64.tar.gz` |
+| macOS arm64 (Apple Silicon) | `bb-form-macos-arm64.tar.gz` |
+| Windows x86_64 | `bb-form-windows-x86_64.zip` |
+
+Giải nén và đặt `bb-form` (hoặc `bb-form.bat` trên Windows) vào thư mục có trong `PATH`.
 
 # Tính năng giao diện người dùng
 
@@ -44,11 +92,16 @@ bb-form form.json [--values values.json] [--out output.json] [field1:value1 ...]
 
 # Giải thích các file
 
-- `src/com/drbinhthanh/bb_form.clj` :: File Clojure chính chứa toàn bộ logic xử lý form và giao diện người dùng
-- `bb.edn` :: File cấu hình cho bbin/babashka với cấu hình tương thích bbin
-- `form.json` :: File cấu hình form, hỗ trợ câu hỏi phân nhánh
-- `values.json` :: File chứa giá trị mặc định cho form
-- `result.json` :: File kết quả sau khi điền form trong terminal
+- `src/com/drbinhthanh/bb_form.clj` — File Clojure chính chứa toàn bộ logic xử lý form và giao diện người dùng
+- `bb.edn` — File cấu hình cho bbin/babashka (bao gồm build tasks)
+- `Formula/bb-form.rb` — Homebrew formula để cài đặt trên macOS/Linux
+- `bucket/bb-form.json` — Scoop manifest để cài đặt trên Windows
+- `scripts/build.sh` — Script build Unix: tạo uberscript và đóng gói cho mọi nền tảng
+- `scripts/build.ps1` — Script build Windows (PowerShell)
+- `.github/workflows/release.yml` — GitHub Actions: tự động build và publish release
+- `form.json` — File cấu hình form, hỗ trợ câu hỏi phân nhánh
+- `values.json` — File chứa giá trị mặc định cho form
+- `result.json` — File kết quả sau khi điền form trong terminal
 
 ## Cấu hình bb.edn
 
