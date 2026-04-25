@@ -4,7 +4,7 @@
   "homepage": "https://github.com/drringo/bb-form",
   "license": "Apache-2.0",
   "url": "https://github.com/drringo/bb-form/releases/download/v0.1.0/bb-form-windows-x86_64.zip",
-  "hash": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+  "hash": "sha256:1fa67e87c03bc5b9c8e90c479fac2a7443679060cff9825643f608135b7e32fe",
   "bin": "bb-form.bat",
   "depends": [
     "babashka"
@@ -50,4 +50,3 @@
     "Dùng thử: bb-form form_sample.json"
   ]
 }
-
