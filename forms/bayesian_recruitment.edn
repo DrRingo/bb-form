@@ -1,0 +1,29 @@
+{:title "Bayesian Recruitment Engine (Phase 6)"
+ :description "Sử dụng Backend Stan để dự đoán khả năng trúng tuyển của ứng viên kèm theo mức độ bất định (uncertainty)."
+ 
+ :import [["../formulas/bayesian_hiring.clj" :as :stan]]
+
+ :variables {:stan_result {}}
+
+ :fields
+ [{:id :experience
+   :label "Số năm kinh nghiệm làm việc?"
+   :type :number
+   :required true}
+   
+  {:id :test_score
+   :label "Điểm bài test kỹ năng (1-10)"
+   :type :number
+   :required true
+   
+   ;; Kích hoạt mô hình MCMC
+   :actions [[:set :stan_result 
+                   [:call :stan/run-stan-model [:var :experience] [:var :test_score]]]]}
+                   
+  ;; Sử dụng [:get] để trích xuất các đặc tính phân phối và hiển thị lên Dynamic Label
+  {:id :result_display
+   :type :info
+   :label [{:show-if [:< [:get [:var :stan_result] :prob] 50]
+            :text "⚠️ CẢNH BÁO CAO: Khả năng ứng viên này phù hợp với công ty chỉ là {{[:get [:var :stan_result] :prob]}}%. (Mức độ tin cậy {{[:get [:var :stan_result] :confidence]}}: dao động từ {{[:get [:var :stan_result] :lower_bound]}}% đến {{[:get [:var :stan_result] :upper_bound]}}%)"}
+           {:show-if [:default]
+            :text "✅ TIỀM NĂNG: Xác suất ứng viên này thành công là {{[:get [:var :stan_result] :prob]}}%. (Mức độ tin cậy {{[:get [:var :stan_result] :confidence]}}: dao động từ {{[:get [:var :stan_result] :lower_bound]}}% đến {{[:get [:var :stan_result] :upper_bound]}}%)"}]}]}

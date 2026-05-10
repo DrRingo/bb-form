@@ -1,0 +1,176 @@
+name: Release bb-form
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set version
+        id: version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+
+      - name: Build dist/bb-form.clj (single-file bundle)
+        run: cp src/com/drbinhthanh/bb_form.clj dist/bb-form.clj
+
+      - name: Package Windows zip
+        run: |
+          cd dist
+          cp ../bb-form.bat bb-form.bat 2>/dev/null || true
+          zip -r ../release/bb-form-windows-x86_64.zip bb-form.clj bb-form.bat
+          cd ..
+
+      - name: Package Unix tarball
+        run: |
+          cd dist
+          cp ../bb-form.sh bb-form 2>/dev/null || cp bb-form.clj bb-form.sh
+          chmod +x bb-form.sh
+          tar czf ../release/bb-form-linux-x86_64.tar.gz bb-form.clj bb-form.sh
+          cp ../release/bb-form-linux-x86_64.tar.gz ../release/bb-form-macos-arm64.tar.gz
+          cd ..
+
+      - name: Generate checksums
+        run: |
+          cd release
+          sha256sum bb-form-windows-x86_64.zip bb-form-linux-x86_64.tar.gz bb-form-macos-arm64.tar.gz > checksums.txt
+          cat checksums.txt
+          cd ..
+
+      - name: Extract hashes
+        id: hashes
+        run: |
+          WIN_HASH=$(sha256sum release/bb-form-windows-x86_64.zip | awk '{print $1}')
+          LINUX_HASH=$(sha256sum release/bb-form-linux-x86_64.tar.gz | awk '{print $1}')
+          MAC_HASH=$(sha256sum release/bb-form-macos-arm64.tar.gz | awk '{print $1}')
+          echo "WIN_HASH=$WIN_HASH" >> $GITHUB_OUTPUT
+          echo "LINUX_HASH=$LINUX_HASH" >> $GITHUB_OUTPUT
+          echo "MAC_HASH=$MAC_HASH" >> $GITHUB_OUTPUT
+
+      - name: Update Scoop manifest
+        run: |
+          VERSION="${{ steps.version.outputs.VERSION }}"
+          WIN_HASH="${{ steps.hashes.outputs.WIN_HASH }}"
+          cat > bucket/bb-form.json <<EOF
+          {
+            "version": "$VERSION",
+            "description": "Terminal form UI tool powered by an EDN Logic Engine with formula imports and Bayesian support.",
+            "homepage": "https://github.com/drringo/bb-form",
+            "license": "Apache-2.0",
+            "url": "https://github.com/drringo/bb-form/releases/download/v$VERSION/bb-form-windows-x86_64.zip",
+            "hash": "sha256:$WIN_HASH",
+            "bin": "bb-form.bat",
+            "depends": ["babashka"],
+            "post_install": [
+              "if (-not (Get-Command gum -ErrorAction SilentlyContinue)) {",
+              "  Write-Host '⚠️  bb-form requires Charm Gum for terminal UI.' -ForegroundColor Yellow",
+              "  Write-Host '   Install it with: winget install charmbracelet.gum' -ForegroundColor Cyan",
+              "}"
+            ],
+            "checkver": { "github": "https://github.com/drringo/bb-form" },
+            "autoupdate": {
+              "url": "https://github.com/drringo/bb-form/releases/download/v\$version/bb-form-windows-x86_64.zip",
+              "hash": {
+                "url": "https://github.com/drringo/bb-form/releases/download/v\$version/checksums.txt",
+                "regex": "([a-fA-F0-9]+)\\\\s+bb-form-windows-x86_64\\\\.zip"
+              }
+            }
+          }
+          EOF
+
+      - name: Update Homebrew formula
+        run: |
+          VERSION="${{ steps.version.outputs.VERSION }}"
+          LINUX_HASH="${{ steps.hashes.outputs.LINUX_HASH }}"
+          MAC_HASH="${{ steps.hashes.outputs.MAC_HASH }}"
+          cat > Formula/bb-form.rb <<EOF
+          class BbForm < Formula
+            desc "Terminal form UI tool powered by an EDN Logic Engine (Babashka + Charm Gum)"
+            homepage "https://github.com/drringo/bb-form"
+            version "$VERSION"
+            license "Apache-2.0"
+
+            on_macos do
+              url "https://github.com/drringo/bb-form/releases/download/v$VERSION/bb-form-macos-arm64.tar.gz"
+              sha256 "$MAC_HASH"
+            end
+
+            on_linux do
+              url "https://github.com/drringo/bb-form/releases/download/v$VERSION/bb-form-linux-x86_64.tar.gz"
+              sha256 "$LINUX_HASH"
+            end
+
+            depends_on "babashka"
+
+            def install
+              bin.install "bb-form.sh" => "bb-form"
+              bin.install "bb-form.clj"
+            end
+
+            def caveats
+              <<~EOS
+                bb-form requires Charm Gum for the terminal UI.
+                Install it with:
+                  brew install charmbracelet/tap/gum
+              EOS
+            end
+
+            test do
+              system "#{bin}/bb-form", "--help"
+            end
+          end
+          EOF
+
+      - name: Commit updated manifests
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add bucket/bb-form.json Formula/bb-form.rb
+          git diff --staged --quiet || git commit -m "chore: bump manifests to v${{ steps.version.outputs.VERSION }}"
+          git push origin HEAD:main
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "bb-form v${{ steps.version.outputs.VERSION }}"
+          body: |
+            ## bb-form v${{ steps.version.outputs.VERSION }}
+
+            ### Install
+
+            **bbin (cross-platform):**
+            ```bash
+            bbin install io.github.drringo/bb-form
+            ```
+
+            **Scoop (Windows):**
+            ```powershell
+            scoop bucket add drringo https://github.com/drringo/bb-form
+            scoop install bb-form
+            ```
+
+            **Homebrew (macOS/Linux):**
+            ```bash
+            brew tap drringo/bb-form https://github.com/drringo/bb-form
+            brew install bb-form
+            ```
+
+            ### What's new in v2.0
+            - ✅ Phase 5: `:import` formula libraries (`.edn` & `.clj`) with namespace alias (`:as`)
+            - ✅ Phase 6: Stochastic variables — Bayesian backend via Stan model integration
+            - ✅ New `[:call]` operator with namespace alias resolution
+            - ✅ New `[:get]` operator to extract map properties
+            - ✅ New `:info` field type for computed read-only display
+            - ✅ Dynamic label interpolation (`{{expr}}`)
+          files: |
+            release/bb-form-windows-x86_64.zip
+            release/bb-form-linux-x86_64.tar.gz
+            release/bb-form-macos-arm64.tar.gz
+            release/checksums.txt

@@ -1,281 +1,254 @@
 # bb-form
 
-Script sử dụng Clojure Babashka và Charm-gum để thu thập dữ liệu từ form đẹp mắt trong terminal với giao diện người dùng được tối ưu hóa
+**English guide: [README.md](./README.md)**
 
-# Yêu cầu hệ thống
+Công cụ CLI dùng Babashka + Charm Gum để thu thập dữ liệu từ các form đẹp mắt trên terminal, được tích hợp **EDN Logic Engine** toàn diện hỗ trợ import công thức, nhãn động và suy luận Bayesian.
 
-- [Clojure babashka](https://babashka.org/)
-- [Charm-gum](https://github.com/charmbracelet/gum)
+---
 
-# Cài đặt nhanh với bbin
+## ✨ Tính Năng
 
-Nếu đã cài [bbin](https://github.com/babashka/bbin):
+| Tính năng | Mô tả |
+|---|---|
+| 🧠 **EDN Logic Engine** | Flat-list fields với bộ thông dịch `eval-expr` (`and/or/not/=/>/<`) |
+| 🔀 **`:show-if` động** | Hiện/ẩn câu hỏi theo trạng thái runtime |
+| 🗄️ **Biến ẩn** | Khai báo `:variables` để theo dõi trạng thái nền |
+| ⚡ **Hiệu ứng phụ** | `:actions` để thay đổi state sau mỗi câu trả lời |
+| 📦 **Import công thức** | Import thư viện `.edn` hoặc `.clj` với alias namespace |
+| 🔣 **Toán tử `[:call]`** | Gọi bất kỳ hàm nào từ thư viện đã import |
+| 🔍 **Toán tử `[:get]`** | Trích xuất thuộc tính từ map kết quả phức tạp |
+| 🎲 **Hỗ trợ xác suất** | Tích hợp mô hình Bayesian Stan qua Clojure bridge |
+| 🏷️ **Nhãn động** | Nội suy giá trị tính toán vào nhãn với `{{expr}}` |
+| 📋 **Field `:info`** | Hiển thị kết quả chỉ đọc, lưu vào output |
+| 📁 **Multi-Stage Forms** | Chia form phức tạp thành `:stages` với hooks |
+
+---
+
+## 📦 Cài Đặt
+
+### Cách 1 — bbin (khuyến nghị, tất cả nền tảng)
 
 ```bash
-# Cài đặt từ GitHub
+# Yêu cầu: babashka + bbin
 bbin install io.github.drringo/bb-form
-
-# Hoặc cài đặt từ thư mục local (nếu đang phát triển)
-bbin install .
 ```
 
-Sau đó bạn có thể chạy lệnh:
+### Cách 2 — Scoop (Windows)
+
+```powershell
+scoop bucket add drringo https://github.com/drringo/bb-form
+scoop install bb-form
+```
+
+### Cách 3 — Homebrew (macOS / Linux)
+
 ```bash
-bb-form form.json [--values values.json] [--out output.json] [field1:value1 ...]
+brew tap drringo/bb-form https://github.com/drringo/bb-form
+brew install bb-form
 ```
 
-# Tính năng giao diện người dùng
+### Cách 4 — Thủ công (mọi nền tảng)
 
-## Màn hình sạch sẽ
-- Tự động xóa màn hình trước khi hiển thị form đầu tiên
-- Giao diện sạch sẽ, không có nội dung cũ từ terminal
+```bash
+git clone https://github.com/drringo/bb-form
+cd bb-form
+bb src/com/drbinhthanh/bb_form.clj <form.edn>
+```
 
-## Dòng trạng thái cố định
-- Hiển thị thông báo lỗi và trạng thái ở vị trí cố định sau tiêu đề form
-- Thông báo lỗi bắt đầu với "::::" để dễ nhận biết
-- Thông báo lỗi chỉ biến mất khi người dùng nhập đúng giá trị
-- Sử dụng GUM style để hiển thị thông báo lỗi đẹp mắt với viền đỏ
+### Điều kiện tiên quyết
 
-## Trải nghiệm người dùng được cải thiện
-- Màn hình được cập nhật liên tục để giữ giao diện sạch sẽ
-- Thông báo lỗi rõ ràng và dễ đọc
-- Giao diện nhất quán trong suốt quá trình điền form
-- Khoảng cách hợp lý giữa các thành phần giao diện
+| Công cụ | Mục đích | Cài đặt |
+|---|---|---|
+| [Babashka](https://babashka.org/) | Clojure runtime | `scoop install babashka` / `brew install borkdude/brew/babashka` |
+| [Charm Gum](https://github.com/charmbracelet/gum) | Giao diện Terminal | `winget install charmbracelet.gum` / `brew install charmbracelet/tap/gum` |
 
-# Giải thích các file
+---
 
-- `src/com/drbinhthanh/bb_form.clj` :: File Clojure chính chứa toàn bộ logic xử lý form và giao diện người dùng
-- `bb.edn` :: File cấu hình cho bbin/babashka với cấu hình tương thích bbin
-- `form.json` :: File cấu hình form, hỗ trợ câu hỏi phân nhánh
-- `values.json` :: File chứa giá trị mặc định cho form
-- `result.json` :: File kết quả sau khi điền form trong terminal
+## 🚀 Cách Sử Dụng
 
-## Cấu hình bb.edn
+```bash
+bb-form <form.edn> [OPTIONS]
+```
 
-File `bb.edn` được cấu hình để tương thích với bbin:
+| Option | Mô tả |
+|---|---|
+| `--values <file.edn>` | Điền sẵn giá trị từ file EDN (chạy tự động / batch mode) |
+| `--out <file.edn>` | Đường dẫn kết quả (mặc định: `result.edn`) |
+
+**Ví dụ:**
+
+```bash
+# Chạy form tương tác
+bb-form forms/job_application.edn
+
+# Chạy batch tự động
+bb-form forms/job_application.edn --values forms/values.edn --out result.edn
+
+# Ví dụ Bayesian scoring
+bb-form forms/bayesian_recruitment.edn
+```
+
+---
+
+## 📝 Cấu Trúc Form
+
+Form là một EDN map. Ví dụ tối giản:
 
 ```clojure
-{:deps {io.github.drringo/bb-form {:local/root "."}
-        cheshire/cheshire {:mvn/version "5.11.0"}
-        babashka/process {:mvn/version "0.5.22"}}
- :paths [".","src"] 
- :bbin/bin {bb-form {:main-opts ["-m" "com.drbinhthanh.bb-form"]}}}
+{:title       "Form của tôi"
+ :description "Vui lòng điền thông tin bên dưới."
+
+ ;; Biến trạng thái ẩn (không hiển thị cho người dùng)
+ :variables {:diem 0}
+
+ :fields
+ [{:id       :ten
+   :label    "Họ tên của bạn?"
+   :type     :text
+   :required true}
+
+  {:id      :tuoi
+   :label   "Tuổi của bạn?"
+   :type    :number
+   :show-if [:>= [:var :diem] 0]}
+
+  {:id     :ket_qua
+   :type   :info
+   :label  "Điểm của bạn là {{[:var :diem]}} điểm."}]}
 ```
 
-### Giải thích cấu hình:
-- `:deps`: Các dependencies cần thiết (cheshire cho JSON, babashka/process cho subprocess)
-- `:paths`: Đường dẫn tìm kiếm source code
-- `:bbin/bin`: Cấu hình cho bbin với `:main-opts` để gọi đúng namespace
+### Các loại field hỗ trợ
 
-# Hướng dẫn sử dụng thủ công (không qua bbin)
+| Loại | Mô tả |
+|---|---|
+| `:text` | Nhập văn bản, hỗ trợ `:regex` validation |
+| `:number` | Nhập số nguyên |
+| `:date` | Nhập ngày (DD-MM-YYYY) với gõ tắt |
+| `:select` | Chọn một lựa chọn (dropdown) |
+| `:multiselect` | Chọn nhiều lựa chọn |
+| `:hidden` | Giá trị tính toán, không hiển thị |
+| `:info` | Nhãn chỉ đọc được tính toán, lưu vào kết quả |
 
-```bash
-bb src/com/drbinhthanh/bb_form.clj form.json [--values values.json] [--out output.json] [field1:value1 ...]
+### Toán tử EDN Logic (`eval-expr`)
+
+```clojure
+[:var :ten_field]              ; lấy giá trị biến
+[:= expr expr]                 ; so sánh bằng
+[:!= expr expr]                ; so sánh khác
+[:> :< :>= :<=]                ; so sánh số
+[:and e1 e2 ...]               ; AND logic
+[:or  e1 e2 ...]               ; OR logic
+[:not e]                       ; NOT logic
+[:+ :- :* :/]                  ; toán học
+[:if dieu_kien then else]      ; rẽ nhánh
+[:get map-expr :key]           ; lấy thuộc tính map
+[:contains? [:var :list] val]  ; kiểm tra phần tử
+[:call :alias/ham arg ...]     ; gọi hàm từ thư viện đã import
+[:str/includes? s sub]         ; kiểm tra chuỗi con
 ```
 
-## Ví dụ sử dụng
+---
 
-```bash
-# Chạy form cơ bản
-bb-form form_sample.json
+## 📦 Import Thư Viện Công Thức
 
-# Chạy form với file values
-bb-form form_sample.json --values values.json
+Import file `.edn` hoặc script Clojure `.clj` đầy đủ:
 
-# Chạy form với output file tùy chỉnh
-bb-form form_sample.json --out my_result.json
-
-# Chạy form với cả values và output
-bb-form form_sample.json --values values.json --out custom_output.json
-
-# Chạy form với giá trị từ command line
-bb-form form_sample.json name:"Nguyễn Văn A" age:25
+```clojure
+:import ["../formulas/cardio_risk.edn"
+         ["../formulas/candidate_score.clj" :as :score]]
 ```
 
-# Hướng dẫn tạo file `form.json`
+Dùng `:as :alias` để rút gọn namespace. Sau đó gọi hàm:
 
-### Cấu trúc cơ bản:
-```json
-{
-  "title": "Tiêu đề form",
-  "description": "Mô tả form",
-  "fields": [
-    {
-      "id": "tên_field",
-      "label": "Nhãn hiển thị",
-      "type": "loại_field",
-      "required": true/false,
-      "options": ["lựa chọn 1", "lựa chọn 2"],
-      "regex": "^[a-zA-Z0-9]+$",
-      "branch": {
-        "lựa chọn": [
-          {
-            "id": "field_con",
-            "label": "Nhãn field con",
-            "type": "loại_field",
-            "required": true/false
-          }
-        ]
-      }
-    }
-  ]
-}
+```clojure
+:actions [[:set :ket_qua [:call :score/analyze-candidate [:var :x] [:var :y]]]]
 ```
 
-### Ví dụ field text với regex:
-```json
-{
-  "id": "email",
-  "label": "Email",
-  "type": "text",
-  "required": true,
-  "regex": "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$",
-  "regexError": "Email không đúng định dạng. Ví dụ: user@example.com"
-}
+### Cấu trúc file `.edn` công thức
+
+```clojure
+{:ns :cardio-risk
+ :consts {:he_so 10}
+ :fns {:tinh_nguy_co (fn [tuoi bmi] (* tuoi bmi (:he_so consts)))}}
 ```
 
-### Các loại field hỗ trợ:
-- `text`: Input văn bản (hỗ trợ validation regex)
-- `number`: Input số nguyên với validation
-- `date`: Input ngày tháng (format DD-MM-YYYY) với validation
-- `select`: Dropdown chọn một lựa chọn
-- `multiselect`: Chọn nhiều lựa chọn
+### Cấu trúc file `.clj` Clojure
 
-### Thuộc tính field:
-- `id`: Định danh duy nhất cho field
-- `label`: Nhãn hiển thị cho người dùng
-- `type`: Loại field (text, number, date, select, multiselect)
-- `required`: Kiểm tra ràng buộc đầu vào (true/false)
-- `options`: Danh sách lựa chọn cho select/multiselect
-- `branch`: Logic phân nhánh - hiển thị field con dựa trên lựa chọn
-- `regex`: Biểu thức chính quy để validate field text (tùy chọn)
-- `regexError`: Thông báo lỗi tùy chỉnh khi regex không thỏa mãn (tùy chọn)
+```clojure
+(ns my.company.math)
 
-### Validation rules:
-- **text**: Hỗ trợ regex validation với thông báo lỗi tùy chỉnh
-- **number**: Bắt buộc nhập số nguyên
-- **date**: Bắt buộc nhập đúng định dạng DD-MM-YYYY, nếu để trống sẽ tự động lấy ngày hôm nay
-  - Hỗ trợ gõ tắt: `04` (ngày 04 tháng hiện tại năm hiện tại), `1204` (ngày 12 tháng 04 năm hiện tại)
-
-### Cải tiến validation:
-- Thông báo lỗi hiển thị ngay lập tức khi người dùng nhập sai
-- Màn hình được cập nhật để hiển thị thông báo lỗi rõ ràng
-- Validation được thực hiện real-time với giao diện phản hồi nhanh
-
-### Tính năng phân nhánh (Branching):
-- Cho phép hiển thị field con dựa trên lựa chọn của field cha
-- Hỗ trợ nhiều cấp độ phân nhánh
-- Tự động ẩn/hiện field dựa trên logic
-
-## File kết quả
-
-Kết quả được lưu vào file `result.json` với cấu trúc:
-```json
-{
-  "selectedByUser": {
-    "field1": "value1",
-    "field2": "value2",
-    "field_with_branch": "selected_option",
-    "field_with_branch_branch": {
-      "selected_option": {
-        "subfield1": "subvalue1",
-        "subfield2": "subvalue2"
-      }
-    },
-    "multiselect_field": ["option1", "option2"],
-    "multiselect_field_branch": {
-      "option1": {
-        "subfield1": "subvalue1"
-      },
-      "option2": {
-        "subfield2": "subvalue2"
-      }
-    }
-  }
-}
+(defn tinh_diem [a b]
+  (* a b 100))
 ```
 
-### Cấu trúc dữ liệu:
-- **Level cao nhất**: Tất cả các field được nhóm vào key `"selectedByUser"`
-- **Field đơn giản**: Giá trị trực tiếp (text, number, date, select)
-- **Field có branching**: 
-  - Giá trị gốc được lưu trực tiếp
-  - Field con được lưu trong key `"{field_id}_branch"`
-- **Field multiselect**: 
-  - Danh sách các lựa chọn được lưu trực tiếp
-  - Field con được lưu trong key `"{field_id}_branch"`
-- **Cấu trúc thống nhất**: Cả select và multiselect đều dùng suffix `"_branch"`
-- **Hỗ trợ nhiều cấp**: Có thể có field con của field con
-- **Lồng nhiều cấp**: Field con có thể tiếp tục có nhánh, tạo ra `{subfield_id}_branch`
+---
 
-### Ví dụ cấu trúc phức tạp:
-```json
-{
-  "selectedByUser": {
-    "name": "Nguyễn Văn A",
-    "age": 25,
-    "gender": "Nữ",
-    "gender_branch": {
-      "Nữ": {
-        "is_pregnant": "Có",
-        "is_pregnant_branch": {
-          "Có": {
-            "gestational_age": 20
-          }
-        }
-      }
-    },
-    "symptoms": ["Sốt", "Khó thở"],
-    "symptoms_branch": {
-      "Sốt": {
-        "temperature": 38.5
-      },
-      "Khó thở": {
-        "breath_level": "Vừa"
-      }
-    },
-    "exam_date": "2024-01-15",
-    "notes": "Ghi chú thêm"
-  }
-}
+## 🎲 Tích Hợp Bayesian / Stan
+
+Kết nối mô hình Stan qua một script `.clj` đóng vai bridge:
+
+```clojure
+;; formulas/bayesian_hiring.clj
+(ns formulas.bayesian-hiring)
+(defn run-stan-model [kinh_nghiem diem_test]
+  ;; gọi cmdstan qua shell, trả về map phân phối xác suất
+  {:prob 78 :variance 0.02 :lower_bound 50 :upper_bound 100 :confidence "95%"})
 ```
 
-### Cách truy cập dữ liệu:
-```javascript
-// Giá trị gốc
-const gender = result.selectedByUser.gender; // "Nữ"
-const symptoms = result.selectedByUser.symptoms; // ["Sốt", "Khó thở"]
+Import và gọi trong form:
 
-// Field con của select
-const isPregnant = result.selectedByUser.gender_branch["Nữ"].is_pregnant; // "Có"
-const gestationalAge = result.selectedByUser.gender_branch["Nữ"].is_pregnant_branch["Có"].gestational_age; // 20
-
-// Field con của multiselect
-const temperature = result.selectedByUser.symptoms_branch["Sốt"].temperature; // 38.5
-const breathLevel = result.selectedByUser.symptoms_branch["Khó thở"].breath_level; // "Vừa"
+```clojure
+:import [["../formulas/bayesian_hiring.clj" :as :stan]]
+:actions [[:set :ket_qua [:call :stan/run-stan-model [:var :kinh_nghiem] [:var :diem]]]]
+:label   "Xác suất tuyển dụng: {{[:get [:var :ket_qua] :prob]}}%
+          (Độ tin cậy {{[:get [:var :ket_qua] :confidence]}}: 
+           từ {{[:get [:var :ket_qua] :lower_bound]}}% đến {{[:get [:var :ket_qua] :upper_bound]}}%)"
 ```
 
-### Lưu ý:
-- Tất cả các field ở level cao nhất được nhóm vào key `"selectedByUser"`
-- **Giá trị gốc luôn nhất quán**: Field có branching vẫn lưu giá trị được chọn trực tiếp
-- **Cấu trúc thống nhất**: Cả select và multiselect đều dùng suffix `"_branch"`
-- **Key trong _branch**: Là giá trị được chọn (ví dụ "Nữ", "Sốt", "Khó thở")
-- **Dễ xử lý**: Không cần kiểm tra kiểu dữ liệu khi truy cập giá trị gốc
-- **Cấu trúc rõ ràng**: Field con được tổ chức theo logic phân cấp
-- **Lồng nhiều cấp**: Hỗ trợ branching không giới hạn độ sâu
+---
 
-# Cập nhật gần đây
+## 📂 Cấu Trúc Dự Án
 
-## Phiên bản hiện tại
-- ✅ **Dòng trạng thái cố định**: Hiển thị thông báo lỗi ở vị trí cố định với prefix "::::"
-- ✅ **Giao diện GUM**: Sử dụng Charm-gum để hiển thị thông báo lỗi đẹp mắt
-- ✅ **Validation real-time**: Thông báo lỗi hiển thị ngay lập tức khi nhập sai
-- ✅ **Trải nghiệm người dùng**: Giao diện nhất quán và dễ sử dụng
-- ✅ **Hỗ trợ bbin hoàn chỉnh**: Cài đặt và chạy thông qua bbin
+```
+bb-form/
+├── src/com/drbinhthanh/bb_form.clj   # Core engine
+├── forms/                             # Các form mẫu
+│   ├── job_application.edn            # Ví dụ tính điểm ma trận
+│   ├── bayesian_recruitment.edn       # Ví dụ tuyển dụng Bayesian
+│   └── health_check.edn
+├── formulas/                          # Thư viện công thức
+│   ├── candidate_score.clj
+│   ├── bayesian_hiring.clj
+│   ├── cardio_risk.edn
+│   └── stan_models/hiring_model.stan
+├── bucket/bb-form.json                # Scoop manifest
+├── Formula/bb-form.rb                 # Homebrew formula
+└── guide.md                           # Hướng dẫn đầy đủ tiếng Việt
+```
 
-## Cải tiến kỹ thuật
-- Sửa lỗi syntax trong các hàm validation
-- Tối ưu hóa hiển thị thông báo lỗi
-- Cải thiện logic clear màn hình và re-render
-- Tăng cường tính ổn định của giao diện
-``` 
+---
+
+## 🗓️ Lịch Sử Phiên Bản
+
+### v2.0.0
+- ✅ **Giai đoạn 5**: `:import` thư viện công thức (`.edn` & `.clj`) với alias `:as`
+- ✅ **Giai đoạn 6**: Hỗ trợ biến xác suất qua tích hợp Bayesian Stan bridge
+- ✅ Toán tử `[:call]` với phân giải alias (ưu tiên: Clojure ns → EDN registry)
+- ✅ Toán tử `[:get]` để trích xuất thuộc tính map
+- ✅ Field type `:info` — hiển thị chỉ đọc, lưu vào kết quả
+- ✅ Nội suy nhãn động `{{expr}}`
+- ✅ Sửa lỗi: actions chạy đúng trong chế độ batch `--values`
+
+### v1.0.0 (Giai đoạn 1–4)
+- ✅ Chuyển từ `.json` sang `.edn`
+- ✅ Flat-list fields + biểu thức `:show-if` EDN
+- ✅ `eval-expr` Logic Engine + thuật toán Restarting Loop
+- ✅ `:variables` trạng thái ẩn + `:actions` hiệu ứng phụ
+- ✅ Multi-stage forms với hooks `on-begin`/`on-end`
+
+---
+
+## 📖 Tài Liệu
+
+- **Hướng dẫn đầy đủ tiếng Việt**: [`guide.md`](./guide.md)
+- **Thiết kế & concept**: [`jsonlogic_concept.md`](./jsonlogic_concept.md)

@@ -1,0 +1,20 @@
+{:title "Backward Loop Test"
+ :description "Kiểm thử cơ chế Restarting Loop với câu hỏi phụ thuộc ngược (Backward Dependency)"
+ :fields
+ [;; Câu hỏi này nằm ở ĐẦU, nhưng lại phụ thuộc vào câu hỏi ở CUỐI
+  {:id :ly_do_tu_choi
+   :label "Vì sao bạn từ chối tham gia?"
+   :type :text
+   :required true
+   :show-if [:= [:var :tham_gia] "Không"]}
+  
+  {:id :ho_ten
+   :label "Họ và tên"
+   :type :text
+   :required true}
+  
+  {:id :tham_gia
+   :label "Bạn có muốn tham gia sự kiện không?"
+   :type :select
+   :required true
+   :options ["Có" "Không"]}]}

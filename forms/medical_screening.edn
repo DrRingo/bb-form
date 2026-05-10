@@ -1,0 +1,106 @@
+;; Form khám sàng lọc y tế — EDN Flat List format
+{:title       "Phiếu Khám Sàng Lọc"
+ :description "Thu thập thông tin sức khỏe ban đầu trước khi gặp bác sĩ"
+
+ :fields
+ [{:id       :yeu_cau_cap_cuu
+   :label    "⚠️ CẢNH BÁO TÌNH TRẠNG NGUY HIỂM: Bệnh nhân có dấu hiệu trở nặng (sốt cao > 39°C hoặc khó thở nặng). Cần gọi xe cấp cứu ngay không?"
+   :type     :select
+   :required true
+   :options  ["Có, gọi cấp cứu ngay lập tức" "Không, đang tự xử lý / đi khám"]
+   ;; Điều kiện này phụ thuộc vào các câu hỏi bên dưới (Nhiệt độ hoặc Mức độ khó thở)
+   :show-if  [:or
+               [:>= [:var :nhiet_do] 39]
+               [:= [:var :muc_do_kho_tho] "Nặng (không nói được)"]]}
+
+  {:id       :ho_ten
+   :label    "Họ và tên bệnh nhân"
+   :type     :text
+   :required true}
+
+  {:id       :ngay_sinh
+   :label    "Ngày sinh"
+   :type     :date
+   :required true}
+
+  {:id       :gioi_tinh
+   :label    "Giới tính"
+   :type     :select
+   :required true
+   :options  ["Nam" "Nữ"]}
+
+  ;; Câu hỏi thai kỳ chỉ hiện với giới tính Nữ
+  {:id       :co_thai
+   :label    "Hiện đang mang thai?"
+   :type     :select
+   :required true
+   :options  ["Có" "Không" "Không chắc"]
+   :show-if  [:= [:var :gioi_tinh] "Nữ"]}
+
+  {:id       :tuan_thai
+   :label    "Tuần thai hiện tại (ước tính)"
+   :type     :number
+   :required true
+   :show-if  [:and 
+               [:= [:var :gioi_tinh] "Nữ"]
+               [:= [:var :co_thai] "Có"]]}
+
+  {:id       :trieu_chung
+   :label    "Triệu chứng hiện tại (chọn tất cả các triệu chứng)"
+   :type     :multiselect
+   :required false
+   :options  ["Sốt" "Ho" "Khó thở" "Đau ngực" "Chóng mặt"
+              "Buồn nôn" "Đau bụng" "Mệt mỏi" "Đau đầu" "Không có triệu chứng"]}
+
+  ;; Khai thác thêm cho các triệu chứng nghiêm trọng
+  {:id       :nhiet_do
+   :label    "Nhiệt độ đo được (°C)"
+   :type     :number
+   :required true
+   :show-if  [:contains? [:var :trieu_chung] "Sốt"]}
+
+  {:id       :so_ngay_sot
+   :label    "Đã sốt bao nhiêu ngày?"
+   :type     :number
+   :required true
+   :show-if  [:contains? [:var :trieu_chung] "Sốt"]}
+
+  {:id       :muc_do_kho_tho
+   :label    "Mức độ khó thở"
+   :type     :select
+   :required true
+   :options  ["Nhẹ (vẫn nói chuyện được)"
+              "Vừa (khó nói chuyện)"
+              "Nặng (không nói được)"]
+   :show-if  [:contains? [:var :trieu_chung] "Khó thở"]}
+
+  {:id       :dau_nguc_kieu
+   :label    "Tính chất đau ngực"
+   :type     :select
+   :required true
+   :options  ["Đau tức" "Đau nhói" "Đau âm ỉ" "Đau lan ra vai/cánh tay"]
+   :show-if  [:contains? [:var :trieu_chung] "Đau ngực"]}
+
+  {:id       :tien_su_benh
+   :label    "Tiền sử bệnh mãn tính (chọn nhiều nếu có)"
+   :type     :multiselect
+   :required false
+   :options  ["Tiểu đường" "Tăng huyết áp" "Tim mạch" "Hen suyễn"
+              "Bệnh thận" "Bệnh gan" "Không có"]}
+
+  {:id         :so_dien_thoai_lien_he
+   :label      "Số điện thoại liên hệ"
+   :type       :text
+   :required   true
+   :regex      "^[0-9]{10,11}$"
+   :regexError "Số điện thoại phải có 10-11 chữ số"}
+
+  {:id       :ngay_kham
+   :label    "Ngày khám"
+   :type     :date
+   :required true}
+
+  {:id       :ghi_chu_them
+   :label    "Thông tin thêm muốn thông báo với bác sĩ"
+   :type     :text
+   :required false}]}

@@ -1,0 +1,46 @@
+{
+  "version": "2.0.0",
+  "description": "Terminal form UI tool powered by an EDN Logic Engine with formula imports and Bayesian support.",
+  "homepage": "https://github.com/drringo/bb-form",
+  "license": "Apache-2.0",
+  "url": "https://github.com/drringo/bb-form/releases/download/v2.0.0/bb-form-windows-x86_64.zip",
+  "hash": "sha256:PLACEHOLDER_WILL_BE_UPDATED_BY_CI",
+  "bin": "bb-form.bat",
+  "depends": ["babashka"],
+  "post_install": [
+    "if (-not (Get-Command gum -ErrorAction SilentlyContinue)) {",
+    "  Write-Host '' ",
+    "  Write-Host '⚠️  bb-form cần Charm Gum để hiển thị UI terminal.' -ForegroundColor Yellow",
+    "  Write-Host '   Cài đặt bằng lệnh: winget install charmbracelet.gum' -ForegroundColor Cyan",
+    "  Write-Host '   Hoặc: scoop install charm-gum' -ForegroundColor Cyan",
+    "  Write-Host ''",
+    "} else {",
+    "  $gumVer = (gum --version 2>&1) -replace 'gum version ',''",
+    "  Write-Host \"✅ gum $gumVer đã sẵn sàng.\" -ForegroundColor Green",
+    "}"
+  ],
+  "checkver": {
+    "github": "https://github.com/drringo/bb-form"
+  },
+  "autoupdate": {
+    "url": "https://github.com/drringo/bb-form/releases/download/v$version/bb-form-windows-x86_64.zip",
+    "hash": {
+      "url": "https://github.com/drringo/bb-form/releases/download/v$version/checksums.txt",
+      "regex": "([a-fA-F0-9]+)\\s+bb-form-windows-x86_64\\.zip"
+    }
+  },
+  "notes": [
+    "bb-form v2.0.0 đã được cài đặt!",
+    "",
+    "Tính năng mới trong v2.0:",
+    "  - :import thư viện công thức (.edn & .clj) với alias namespace",
+    "  - Tích hợp Bayesian backend qua Stan models",
+    "  - Toán tử [:call] và [:get] trong EDN Logic Engine",
+    "  - Field type :info để hiển thị kết quả tính toán",
+    "  - Dynamic label interpolation ({{expr}})",
+    "",
+    "⚠️  Nếu chưa cài gum, hãy chạy: winget install charmbracelet.gum",
+    "",
+    "Thử ngay: bb-form forms/job_application.edn"
+  ]
+}

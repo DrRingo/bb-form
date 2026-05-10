@@ -1,315 +1,235 @@
 # bb-form
 
-**Hướng dẫn bằng tiếng Việt ở đây [README.vi.md](./README.vi.md)**
+**Hướng dẫn bằng tiếng Việt: [README.vi.md](./README.vi.md)**
 
-A script using Clojure Babashka and Charm-gum to collect data from beautiful forms in the terminal with an optimized user interface.
+A Babashka + Charm Gum CLI tool to collect data through beautiful terminal forms, powered by a full-featured **EDN Logic Engine** with formula imports, dynamic labels, and Bayesian inference support.
 
-# System Requirements
+---
 
-- [Clojure babashka](https://babashka.org/)
-- [Charm-gum](https://github.com/charmbracelet/gum)
+## ✨ Features
 
-# Quick Install with bbin
+| Feature | Description |
+|---|---|
+| 🧠 **EDN Logic Engine** | Flat-list fields with `eval-expr` interpreter (`and/or/not/=/>/<`) |
+| 🔀 **Dynamic `:show-if`** | Conditionally show/hide fields based on runtime state |
+| 🗄️ **Hidden Variables** | Declare `:variables` to track background state |
+| ⚡ **Side Effects** | `:actions` to mutate state on each answer |
+| 📦 **Formula Imports** | Import `.edn` or `.clj` formula libraries with namespace aliases |
+| 🔣 **`[:call]` Operator** | Call any imported function using `[:call :alias/fn-name arg …]` |
+| 🔍 **`[:get]` Operator** | Extract properties from complex map results |
+| 🎲 **Stochastic Support** | Integrate Bayesian Stan models via Clojure bridge scripts |
+| 🏷️ **Dynamic Labels** | Interpolate computed values into labels with `{{expr}}` |
+| 📋 **`:info` Field** | Read-only display field that saves its resolved label to output |
+| 📁 **Multi-Stage Forms** | Organize complex forms into `:stages` with `on-begin`/`on-end` hooks |
 
-If you have [bbin](https://github.com/babashka/bbin) installed:
+---
+
+## 📦 Installation
+
+### Option 1 — bbin (recommended, all platforms)
 
 ```bash
-# Install from GitHub
+# Requires babashka + bbin
 bbin install io.github.drringo/bb-form
-
-# Or install from local folder (for development)
-bbin install .
 ```
 
-Then you can run:
+### Option 2 — Scoop (Windows)
+
+```powershell
+scoop bucket add drringo https://github.com/drringo/bb-form
+scoop install bb-form
+```
+
+### Option 3 — Homebrew (macOS / Linux)
+
 ```bash
-bb-form form.json [--values values.json] [--out output.json] [field1:value1 ...]
+brew tap drringo/bb-form https://github.com/drringo/bb-form
+brew install bb-form
 ```
 
-# User Interface Features
+### Option 4 — Manual (any platform)
 
-## Clean Screen
-- Automatically clears the screen before showing the first form
-- Clean interface, no old terminal content
+```bash
+git clone https://github.com/drringo/bb-form
+cd bb-form
+bb src/com/drbinhthanh/bb_form.clj <form.edn>
+```
 
-## Fixed Status Line
-- Shows error/status messages in a fixed position after the form title
-- Error messages start with "::::" for easy recognition
-- Error messages disappear only when the user enters a valid value
-- Uses GUM style to display beautiful error messages with a red border
+### Prerequisites
 
-## Improved User Experience
-- Continuously updates the screen to keep the interface clean
-- Clear and easy-to-read error messages
-- Consistent interface throughout the form process
-- Reasonable spacing between UI components
+| Tool | Purpose | Install |
+|---|---|---|
+| [Babashka](https://babashka.org/) | Clojure runtime | `scoop install babashka` / `brew install borkdude/brew/babashka` |
+| [Charm Gum](https://github.com/charmbracelet/gum) | Terminal UI | `winget install charmbracelet.gum` / `brew install charmbracelet/tap/gum` |
 
-# File Explanation
+---
 
-- `src/com/drbinhthanh/bb_form.clj`: Main Clojure file containing all form and UI logic
-- `bb.edn`: Config file for bbin/babashka, compatible with bbin
-- `form.json`: Form config file, supports branching questions
-- `values.json`: File containing default values for the form
-- `result.json`: Output file after filling the form in the terminal
+## 🚀 Usage
 
-## bb.edn Configuration
+```bash
+bb-form <form.edn> [OPTIONS]
+```
 
-The `bb.edn` file is configured for bbin compatibility:
+| Option | Description |
+|---|---|
+| `--values <file.edn>` | Pre-fill answers from an EDN file (non-interactive / batch mode) |
+| `--out <file.edn>` | Output result path (default: `result.edn`) |
+
+**Examples:**
+
+```bash
+# Basic interactive form
+bb-form forms/job_application.edn
+
+# Non-interactive batch run
+bb-form forms/job_application.edn --values forms/values.edn --out result.edn
+
+# Bayesian scoring example
+bb-form forms/bayesian_recruitment.edn
+```
+
+---
+
+## 📝 Form Structure
+
+A form is an EDN map. Minimal example:
 
 ```clojure
-{:deps {io.github.drringo/bb-form {:local/root "."}
-        cheshire/cheshire {:mvn/version "5.11.0"}
-        babashka/process {:mvn/version "0.5.22"}}
- :paths [".","src"] 
- :bbin/bin {bb-form {:main-opts ["-m" "com.drbinhthanh.bb-form"]}}}
+{:title       "My Form"
+ :description "Fill in the details below."
+
+ ;; Hidden state variables (not shown to user)
+ :variables {:score 0}
+
+ :fields
+ [{:id       :name
+   :label    "Your name?"
+   :type     :text
+   :required true}
+
+  {:id      :age
+   :label   "Your age?"
+   :type    :number
+   :show-if [:>= [:var :score] 0]}
+
+  {:id      :result
+   :type    :info
+   :label   "Your score is {{[:var :score]}} points."}]}
 ```
 
-### Config explanation:
-- `:deps`: Required dependencies (cheshire for JSON, babashka/process for subprocess)
-- `:paths`: Source code search paths
-- `:bbin/bin`: bbin config with `:main-opts` to call the correct namespace
+### Supported field types
 
-# Manual Usage (without bbin)
+| Type | Description |
+|---|---|
+| `:text` | Text input with optional `:regex` validation |
+| `:number` | Integer input |
+| `:date` | Date input (DD-MM-YYYY) with shortcuts |
+| `:select` | Single-choice dropdown |
+| `:multiselect` | Multiple-choice selection |
+| `:hidden` | Computed value, not displayed |
+| `:info` | Read-only computed label, saved to output |
 
-```bash
-bb src/com/drbinhthanh/bb_form.clj form.json [--values values.json] [--out output.json] [field1:value1 ...]
+### EDN Logic Operators (`eval-expr`)
+
+```clojure
+[:var :field_id]               ; get variable value
+[:= expr expr]                 ; equality
+[:!= expr expr]                ; inequality
+[:> :< :>= :<=]                ; numeric comparison
+[:and e1 e2 ...]               ; logical AND
+[:or  e1 e2 ...]               ; logical OR
+[:not e]                       ; logical NOT
+[:+ :- :* :/]                  ; arithmetic
+[:if cond then else]           ; conditional expression
+[:get map-expr :key]           ; get map property
+[:contains? [:var :list] val]  ; list membership
+[:call :alias/fn arg ...]      ; call imported formula function
+[:str/includes? s sub]         ; string contains
 ```
 
-## Usage Examples
+---
 
-```bash
-# Basic form
-bb-form form_sample.json
+## 📦 Importing Formula Libraries
 
-# Form with values file
-bb-form form_sample.json --values values.json
+Import `.edn` formula files or full Clojure `.clj` scripts:
 
-# Form with custom output file
-bb-form form_sample.json --out my_result.json
-
-# Form with both values and output
-bb-form form_sample.json --values values.json --out custom_output.json
-
-# Form with values from command line
-bb-form form_sample.json name:"Nguyen Van A" age:25
+```clojure
+:import ["../formulas/cardio_risk.edn"
+         ["../formulas/candidate_score.clj" :as :score]]
 ```
 
-# How to create `form.json`
+Use `:as :alias` to shorten long Clojure namespaces. Then call functions:
 
-### Basic structure:
-```json
-{
-  "title": "Form title",
-  "description": "Form description",
-  "fields": [
-    {
-      "id": "field_name",
-      "label": "Display label",
-      "type": "field_type",
-      "required": true/false,
-      "options": ["option 1", "option 2"],
-      "regex": "^[a-zA-Z0-9]+$",
-      "branch": {
-        "option": [
-          {
-            "id": "subfield",
-            "label": "Subfield label",
-            "type": "field_type",
-            "required": true/false
-          }
-        ]
-      }
-    }
-  ]
-}
+```clojure
+:actions [[:set :result [:call :score/analyze-candidate [:var :x] [:var :y]]]]
 ```
 
-### Example text field with regex:
-```json
-{
-  "id": "email",
-  "label": "Email",
-  "type": "text",
-  "required": true,
-  "regex": "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$",
-  "regexError": "Invalid email format. Example: user@example.com"
-}
+---
+
+## 🎲 Bayesian / Stan Integration
+
+Bridge a Stan model through a `.clj` wrapper script:
+
+```clojure
+;; formulas/bayesian_hiring.clj
+(ns formulas.bayesian-hiring)
+(defn run-stan-model [experience test-score]
+  ;; calls cmdstan via shell, returns posterior map
+  {:prob 78 :variance 0.02 :lower_bound 50 :upper_bound 100 :confidence "95%"})
 ```
 
-### Supported field types:
-- `text`: Text input (supports regex validation)
-- `number`: Integer input with validation
-- `date`: Date input (format DD-MM-YYYY) with validation
-- `select`: Dropdown single choice
-- `multiselect`: Multiple choices
+Import and call it in a form:
 
-### Field attributes:
-- `id`: Unique identifier for the field
-- `label`: Display label for the user
-- `type`: Field type (text, number, date, select, multiselect)
-- `required`: Input validation (true/false)
-- `options`: Options list for select/multiselect
-- `branch`: Branching logic - show subfields based on selection
-- `regex`: Regex for text field validation (optional)
-- `regexError`: Custom error message for regex (optional)
-
-### Validation rules:
-- **text**: Supports regex validation with custom error message
-- **number**: Must be an integer
-- **date**: Must be in DD-MM-YYYY format, defaults to today if blank
-  - Supports shortcuts: `04` (4th of current month/year), `1204` (12th April current year)
-
-### Validation improvements:
-- Error messages show immediately when input is invalid
-- Screen updates to show clear error messages
-- Real-time validation with fast UI feedback
-
-### Branching feature:
-- Show subfields based on parent field selection
-- Supports multi-level branching
-- Auto hide/show fields based on logic
-
-## Output file
-
-Results are saved to `result.json` with the structure:
-```json
-{
-  "selectedByUser": {
-    "field1": "value1",
-    "field2": "value2",
-    "field_with_branch": "selected_option",
-    "field_with_branch_branch": {
-      "selected_option": {
-        "subfield1": "subvalue1",
-        "subfield2": "subvalue2"
-      }
-    },
-    "multiselect_field": ["option1", "option2"],
-    "multiselect_field_branch": {
-      "option1": {
-        "subfield1": "subvalue1"
-      },
-      "option2": {
-        "subfield2": "subvalue2"
-      }
-    }
-  }
-}
+```clojure
+:import [["../formulas/bayesian_hiring.clj" :as :stan]]
+:actions [[:set :result [:call :stan/run-stan-model [:var :exp] [:var :score]]]]
+:label   "Hire probability: {{[:get [:var :result] :prob]}}%"
 ```
 
-### Data structure:
-- **Top level**: All fields are grouped under the `"selectedByUser"` key
-- **Simple fields**: Direct value (text, number, date, select)
-- **Fields with branching**:
-  - Main value is stored directly
-  - Subfields are stored under `"{field_id}_branch"`
-- **Multiselect fields**:
-  - List of selected options stored directly
-  - Subfields stored under `"{field_id}_branch"`
-- **Unified structure**: Both select and multiselect use the `"_branch"` suffix
-- **Multi-level support**: Subfields can have their own branches
-- **Deep nesting**: Subfields can continue branching, creating `{subfield_id}_branch`
+---
 
-### Complex structure example:
-```json
-{
-  "selectedByUser": {
-    "name": "Nguyen Van A",
-    "age": 25,
-    "gender": "Female",
-    "gender_branch": {
-      "Female": {
-        "is_pregnant": "Yes",
-        "is_pregnant_branch": {
-          "Yes": {
-            "gestational_age": 20
-          }
-        }
-      }
-    },
-    "symptoms": ["Fever", "Shortness of breath"],
-    "symptoms_branch": {
-      "Fever": {
-        "temperature": 38.5
-      },
-      "Shortness of breath": {
-        "breath_level": "Medium"
-      }
-    },
-    "exam_date": "2024-01-15",
-    "notes": "Additional notes"
-  }
-}
+## 📂 Project Structure
+
+```
+bb-form/
+├── src/com/drbinhthanh/bb_form.clj   # Core engine
+├── forms/                             # Sample forms
+│   ├── job_application.edn            # Matrix scoring example
+│   ├── bayesian_recruitment.edn       # Bayesian hiring example
+│   └── health_check.edn
+├── formulas/                          # Formula libraries
+│   ├── candidate_score.clj
+│   ├── bayesian_hiring.clj
+│   ├── cardio_risk.edn
+│   └── stan_models/hiring_model.stan
+├── bucket/bb-form.json                # Scoop manifest
+├── Formula/bb-form.rb                 # Homebrew formula
+└── guide.md                           # Full Vietnamese user guide
 ```
 
-### How to access data:
-```javascript
-// Main value
-const gender = result.selectedByUser.gender; // "Female"
-const symptoms = result.selectedByUser.symptoms; // ["Fever", "Shortness of breath"]
+---
 
-// Subfields of select
-const isPregnant = result.selectedByUser.gender_branch["Female"].is_pregnant; // "Yes"
-const gestationalAge = result.selectedByUser.gender_branch["Female"].is_pregnant_branch["Yes"].gestational_age; // 20
+## 🗓️ Changelog
 
-// Subfields of multiselect
-const temperature = result.selectedByUser.symptoms_branch["Fever"].temperature; // 38.5
-const breathLevel = result.selectedByUser.symptoms_branch["Shortness of breath"].breath_level; // "Medium"
-```
+### v2.0.0
+- ✅ **Phase 5**: `:import` formula libraries (`.edn` & `.clj`) with `:as` namespace alias
+- ✅ **Phase 6**: Stochastic variable support via Bayesian Stan model bridge
+- ✅ `[:call]` operator with alias resolution (priority: Clojure ns → EDN registry)
+- ✅ `[:get]` operator to extract map properties
+- ✅ `:info` field type — computed read-only display saved to output
+- ✅ Dynamic label interpolation `{{expr}}`
+- ✅ Bug fix: actions now execute correctly in batch `--values` mode
 
-### Notes:
-- All top-level fields are grouped under `"selectedByUser"`
-- **Main value always present**: Fields with branching still store the selected value directly
-- **Unified structure**: Both select and multiselect use the `"_branch"` suffix
-- **Key in _branch**: Is the selected value (e.g. "Female", "Fever", "Shortness of breath")
-- **Easy to process**: No need to check data type when accessing main value
-- **Clear structure**: Subfields are organized by logic
-- **Deep nesting**: Unlimited branching supported
+### v1.0.0 (Phases 1–4)
+- ✅ Migration from `.json` to `.edn`
+- ✅ Flat-list fields + `:show-if` EDN expressions
+- ✅ `eval-expr` Logic Engine + Restarting Loop algorithm
+- ✅ `:variables` hidden state + `:actions` side effects
+- ✅ Multi-stage forms with `on-begin`/`on-end` hooks
 
-# Recent Updates
+---
 
-## Current version
-- ✅ **Fixed status line**: Error messages shown in a fixed position with prefix "::::"
-- ✅ **GUM UI**: Uses Charm-gum for beautiful error messages
-- ✅ **Real-time validation**: Error messages show immediately on invalid input
-- ✅ **User experience**: Consistent and easy-to-use interface
-- ✅ **Full bbin support**: Install and run via bbin
+## 📖 Documentation
 
-## Technical improvements
-- Fixed validation syntax bugs
-- Optimized error message display
-- Improved screen clearing and re-render logic
-- Increased UI stability
-- Fixed `bb.edn` config for bbin compatibility
-- Added `:main-opts` to call the correct namespace with bbin
-
-## bbin fixes
-- ✅ **Fixed `bb.edn` config**: Changed from `:ns-default` to `:main-opts` for bbin compatibility
-- ✅ **Syntax fix**: Removed extra curly braces in config
-- ✅ **Fully compatible**: Now can install and run via bbin without errors
-
-# Troubleshooting
-
-## Common issues
-
-### Error "Could not resolve sym to a function"
-- **Cause**: `bb.edn` config is not correct for bbin
-- **Solution**: Make sure to use `:main-opts` instead of `:ns-default` in bbin config
-
-### Error "FileNotFoundException --values"
-- **Cause**: bbin cannot find the file in the current directory
-- **Solution**: Make sure to run the command from the directory containing the form and values files
-
-### Error "Command not found: bb-form"
-- **Cause**: Script not installed with bbin
-- **Solution**: Run `bbin install .` from the project directory
-
-## How to check installation
-
-```bash
-# List installed scripts
-bbin ls
-
-# Check if the script works
-bb-form --help
-```
+- **Vietnamese user guide**: [`guide.md`](./guide.md)
+- **Concept & design**: [`jsonlogic_concept.md`](./jsonlogic_concept.md)

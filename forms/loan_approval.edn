@@ -1,0 +1,124 @@
+{:title "Hệ Thống Thẩm Định Vay Vốn Đa Tầng"
+ :description "Ứng dụng chấm điểm tín dụng động với nhiều giai đoạn thẩm định, sử dụng biến ẩn và vòng lặp tự động."
+ 
+ :variables {:global_credit_score 100
+             :global_total_assets 0
+             :loan_status "Chờ thẩm định"}
+             
+ :stages
+ [;; ================= STAGE 1: Thông tin Cá nhân & Rủi ro =================
+  {:id :stage_1_ca_nhan
+   :on-begin [[:print "▶ GIAI ĐOẠN 1: Thu thập thông tin Khách hàng & Đánh giá Rủi ro sơ bộ"]]
+   :fields
+   [;; [BACKWARD QUESTION] Câu hỏi này nằm ở đầu form nhưng ban đầu bị ẩn.
+    ;; Nó chỉ hiện ra nếu ở cuối form, khách hàng khai báo có Nợ xấu khiến local_risk tăng cao!
+    {:id :giai_trinh_rui_ro
+     :label "⚠️ CẢNH BÁO RỦI RO CAO: Điểm rủi ro của bạn đã vượt quá giới hạn. Vui lòng giải trình ngắn gọn lý do có nợ xấu trước đây:"
+     :type :text
+     :required true
+     :show-if [:>= [:var :local_risk_points] 50]}
+    
+    {:id :ho_ten
+     :label "1. Họ và tên khách hàng"
+     :type :text
+     :required true}
+     
+    {:id :ngay_sinh
+     :label "2. Ngày sinh"
+     :type :date
+     :required true}
+     
+    {:id :thu_nhap_thang
+     :label "3. Thu nhập trung bình hàng tháng (VNĐ)"
+     :type :number
+     :required true}
+     
+    {:id :lich_su_no_xau
+     :label "4. Bạn có từng bị nợ xấu (CIC nhóm 3 trở lên) trong 5 năm qua không?"
+     :type :select
+     :options ["Không, tôi luôn trả đúng hạn" "Có, tôi từng bị nợ xấu"]
+     :required true
+     ;; ACTION: Nếu có nợ xấu, trừ 50 điểm tín dụng Global và TĂNG 50 điểm rủi ro Local
+     ;; Sự thay đổi của local_risk_points sẽ kích hoạt vòng lặp chạy ngược lên hỏi :giai_trinh_rui_ro
+     :actions [[:set :global_credit_score [:if [:= [:var :lich_su_no_xau] "Có, tôi từng bị nợ xấu"] 
+                                               [:- [:var :global_credit_score] 50] 
+                                               [:var :global_credit_score]]]]}
+                                               
+    ;; Hidden var này phải định nghĩa SAU field lich_su_no_xau để lấy giá trị động
+    {:id :local_risk_points
+     :type :hidden
+     :value [:if [:= [:var :lich_su_no_xau] "Có, tôi từng bị nợ xấu"] 50 0]}
+    
+    ;; Câu hỏi rẽ nhánh đơn giản
+    {:id :loai_hinh_cong_viec
+     :label "5. Bạn đang làm công việc gì?"
+     :type :select
+     :options ["Nhân viên văn phòng" "Tự doanh/Kinh doanh tự do" "Khác"]
+     :required true
+     :actions [[:set :global_credit_score [:if [:= [:var :loai_hinh_cong_viec] "Nhân viên văn phòng"] 
+                                               [:+ [:var :global_credit_score] 20] 
+                                               [:var :global_credit_score]]]]}]
+                                               
+   ;; Hành động chạy khi hoàn tất Stage 1
+   :on-complete [[:print "Hoàn tất Giai đoạn 1. Chuyển dữ liệu sang bộ phận Thẩm định Tài sản..."]]}
+
+  ;; ================= STAGE 2: Khai báo Tài sản =================
+  {:id :stage_2_tai_san
+   :on-begin [[:print "▶ GIAI ĐOẠN 2: Đánh giá Năng lực Tài chính"]]
+   :fields
+   [;; [BACKWARD QUESTION] Khai báo đồng sở hữu nếu chọn multiselect có "Bất động sản" ở bên dưới
+    {:id :thong_tin_nguoi_dong_so_huu
+     :label "📝 YÊU CẦU BỔ SUNG: Bạn có khai báo Bất động sản. Vui lòng nhập tên người Đồng sở hữu (nếu có, hoặc nhập 'Không'):"
+     :type :text
+     :required true
+     :show-if [:contains? [:var :danh_sach_tai_san] "Bất động sản"]}
+     
+    {:id :so_tien_muon_vay
+     :label "1. Số tiền bạn muốn vay (VNĐ)"
+     :type :number
+     :required true}
+     
+    {:id :danh_sach_tai_san
+     :label "2. Chọn các loại tài sản bạn đang sở hữu (có thể chọn nhiều)"
+     :type :multiselect
+     :options ["Bất động sản" "Ô tô" "Sổ tiết kiệm" "Không có tài sản đảm bảo"]
+     :required true}
+     
+    ;; Biến địa phương lưu giá trị ước tính tài sản
+    {:id :local_asset_value
+     :type :hidden
+     :value [:+ 
+               [:if [:contains? [:var :danh_sach_tai_san] "Bất động sản"] 1000000000 0]
+               [:if [:contains? [:var :danh_sach_tai_san] "Ô tô"] 500000000 0]
+               [:if [:contains? [:var :danh_sach_tai_san] "Sổ tiết kiệm"] 200000000 0]]}]
+               
+   :on-complete [;; Chuyển biến local tài sản lên Global
+                 [:set :global_total_assets [:var :local_asset_value]]
+                 [:print "Đã ghi nhận khối lượng tài sản."]]}
+                 
+  ;; ================= STAGE 3: Quyết Định =================
+  {:id :stage_3_quyet_dinh
+   :on-begin [[:print "▶ GIAI ĐOẠN 3: Ra Quyết định Phê duyệt"]]
+   :fields
+   [;; Hidden var để tính toán khả năng phê duyệt dựa trên Global Vars
+    {:id :local_du_dieu_kien
+     :type :hidden
+     :value [:and 
+              [:>= [:var :global_credit_score] 100]
+              [:>= [:var :global_total_assets] [:var :so_tien_muon_vay]]]}
+              
+    {:id :thong_bao_chap_thuan
+     :label "🎉 CHÚC MỪNG: Hồ sơ của bạn đã đủ điều kiện phê duyệt! (Nhập 'OK' để tiếp tục)"
+     :type :text
+     :required true
+     :show-if [:var :local_du_dieu_kien]
+     :actions [[:set :loan_status "Đã Phê Duyệt"]]}
+     
+    {:id :thong_bao_tu_choi
+     :label "❌ RẤT TIẾC: Điểm tín dụng hoặc Tài sản đảm bảo của bạn không đủ đáp ứng. (Nhập 'OK' để đóng)"
+     :type :text
+     :required true
+     :show-if [:not [:var :local_du_dieu_kien]]
+     :actions [[:set :loan_status "Bị Từ Chối"]]}]
+     
+   :on-complete [[:print "Cảm ơn bạn đã sử dụng Hệ thống Thẩm định tự động!"]]}]}

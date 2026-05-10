@@ -1,0 +1,63 @@
+{:title "Kiểm tra rủi ro tim mạch"
+ :description "Form mẫu minh hoạ tính năng Import Formula."
+ 
+ :import ["../formulas/cardio_risk.edn"]
+
+ :variables {:risk_score 0.0
+             :risk_category :unknown}
+
+ :fields
+ [{:id :ho_ten
+   :label "Họ và tên"
+   :type :text
+   :required true}
+   
+  {:id :tuoi
+   :label "Tuổi"
+   :type :number
+   :required true}
+   
+  {:id :gioi_tinh
+   :label "Giới tính"
+   :type :select
+   :options ["Nam" "Nữ"]
+   :required true}
+   
+  {:id :bmi
+   :label "Chỉ số BMI"
+   :type :number
+   :required true}
+   
+  {:id :hut_thuoc
+   :label "Bạn có hút thuốc không?"
+   :type :select
+   :options ["Có" "Không"]
+   :required true}
+   
+  {:id :hdl
+   :label "Chỉ số HDL (cholesterol tốt)"
+   :type :number
+   :required true
+   
+   ;; Tính điểm rủi ro tim mạch ngay sau khi có đủ thông tin
+   :actions [[:set :risk_score [:call :cardio-risk/calc-risk 
+                                      [:var :tuoi] 
+                                      [:var :gioi_tinh] 
+                                      [:var :bmi] 
+                                      [:if [:= [:var :hut_thuoc] "Có"] true false] 
+                                      [:var :hdl]]]
+             ;; Lấy phân loại rủi ro
+             [:set :risk_category [:call :cardio-risk/risk-category [:var :risk_score]]]]}
+             
+  {:id :thong_bao_nguy_hiem
+   :label "⚠️ CẢNH BÁO: Rủi ro tim mạch của bạn ở mức CAO. Hãy đến bác sĩ!"
+   :type :text
+   :required false
+   :show-if [:or [:= [:var :risk_category] :high] 
+                 [:= [:var :risk_category] :very-high]]}
+                 
+  {:id :thong_bao_an_toan
+   :label "✅ Tốt lắm: Rủi ro tim mạch của bạn ở mức THẤP."
+   :type :text
+   :required false
+   :show-if [:= [:var :risk_category] :low]}]}

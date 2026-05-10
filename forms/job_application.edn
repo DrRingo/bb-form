@@ -1,0 +1,58 @@
+{:title "Hệ thống Phân Tích Kỹ Năng Ứng Viên (Matrix Score)"
+ :description "Form sử dụng thư viện tính toán ma trận bằng Clojure (.clj) để phân loại ứng viên."
+ 
+ ;; Import file Clojure chứa thư viện tính toán ma trận và phân tích
+ :import ["../formulas/math_matrix.clj"
+          ["../formulas/candidate_score.clj" :as :score]]
+
+ ;; Khai báo biến ẩn để lưu kết quả phân tích
+ :variables {:analysis_result {}
+             :recommended_role "Đang phân tích"
+             :best_score 0}
+
+ :fields
+ [{:id :ho_ten
+   :label "Họ và tên ứng viên"
+   :type :text
+   :required true}
+   
+  {:id :ui_score
+   :label "1. Tự đánh giá kỹ năng UI/UX (0-10)"
+   :type :number
+   :required true}
+   
+  {:id :sys_score
+   :label "2. Tự đánh giá kỹ năng System Design (0-10)"
+   :type :number
+   :required true}
+   
+  {:id :algo_score
+   :label "3. Tự đánh giá kỹ năng Thuật Toán (0-10)"
+   :type :number
+   :required true}
+   
+  {:id :devops_score
+   :label "4. Tự đánh giá kỹ năng DevOps/Deployment (0-10)"
+   :type :number
+   :required true
+   
+   ;; Kích hoạt hàm tính toán ma trận từ Clojure namespace qua alias :score
+   :actions [[:set :analysis_result 
+                   [:call :score/analyze-candidate 
+                          [:var :ui_score] 
+                          [:var :sys_score] 
+                          [:var :algo_score] 
+                          [:var :devops_score]]]
+             ;; Trích xuất Role và Score từ object map trả về
+             [:set :recommended_role [:call :score/get-recommended-role [:var :analysis_result]]]
+             [:set :best_score [:call :score/get-best-score [:var :analysis_result]]]]}
+             
+  {:id :ket_luan_truot
+   :label "⚠️ Rất tiếc, điểm cao nhất của bạn quá thấp để phù hợp với bất kỳ vị trí nào."
+   :type :text
+   :show-if [:< [:var :best_score] 50]}
+   
+  {:id :ket_luan_dau
+   :label "🎉 CHÚC MỪNG! Dựa trên ma trận năng lực, vị trí phù hợp nhất với bạn là {{recommended_role}} với số điểm {{best_score}}/100."
+   :type :text
+   :show-if [:>= [:var :best_score] 50]}]}

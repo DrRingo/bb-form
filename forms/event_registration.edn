@@ -1,0 +1,69 @@
+;; Form đăng ký sự kiện — EDN Flat List format
+{:title       "Đăng Ký Sự Kiện"
+ :description "Đăng ký tham dự hội thảo Clojure & Babashka 2026"
+
+ :fields
+ [{:id       :ho_ten
+   :label    "Họ và tên"
+   :type     :text
+   :required true}
+
+  {:id         :email
+   :label      "Email liên lạc"
+   :type       :text
+   :required   true
+   :regex      "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$"
+   :regexError "Email không hợp lệ"}
+
+  {:id         :so_dien_thoai
+   :label      "Số điện thoại"
+   :type       :text
+   :required   false
+   :regex      "^[0-9]{10,11}$"
+   :regexError "Số điện thoại phải có 10-11 chữ số"}
+
+  {:id       :loai_ve
+   :label    "Loại vé đăng ký"
+   :type     :select
+   :required true
+   :options  ["Tham dự trực tiếp" "Xem trực tuyến" "Chỉ nhận tài liệu"]}
+
+  ;; Bắt đầu các câu hỏi show-if dựa vào vé trực tiếp
+  {:id       :che_do_an
+   :label    "Chế độ ăn"
+   :type     :select
+   :required true
+   :options  ["Bình thường" "Chay" "Không ăn"]
+   :show-if  [:= [:var :loai_ve] "Tham dự trực tiếp"]}
+
+  {:id       :can_xe_dua_don
+   :label    "Cần hỗ trợ xe đưa đón?"
+   :type     :select
+   :required true
+   :options  ["Có" "Không"]
+   :show-if  [:= [:var :loai_ve] "Tham dự trực tiếp"]}
+
+  {:id       :dia_chi_don
+   :label    "Địa chỉ cần đón"
+   :type     :text
+   :required true
+   :show-if  [:and
+               [:= [:var :loai_ve] "Tham dự trực tiếp"]
+               [:= [:var :can_xe_dua_don] "Có"]]}
+
+  {:id       :chu_de_quan_tam
+   :label    "Chủ đề quan tâm (chọn nhiều)"
+   :type     :multiselect
+   :required false
+   :options  ["Clojure cơ bản" "Babashka scripting" "ClojureScript"
+              "EDN & Data formats" "Functional Programming" "Datomic"]}
+
+  {:id       :ngay_tham_du
+   :label    "Ngày tham dự"
+   :type     :date
+   :required true}
+
+  {:id       :cau_hoi_truoc
+   :label    "Câu hỏi muốn gửi tới diễn giả (tùy chọn)"
+   :type     :text
+   :required false}]}

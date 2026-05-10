@@ -1,0 +1,61 @@
+{:title "Hệ thống Xét Duyệt Hồ Sơ (Đa Vòng)"
+ :description "Minh hoạ tính năng Stages, Hidden Variables và Actions"
+ 
+ ;; Khai báo Global Variables (Truy cập được ở tất cả các vòng)
+ :variables {:diem_tong 0
+             :trang_thai "Đang xét duyệt"}
+ 
+ :stages
+ [;; ================= VÒNG 1 =================
+  {:id :vong_1
+   :on-begin [[:print "Chào mừng bạn đến với VÒNG 1: Đánh giá Kinh Nghiệm!"]]
+   :fields
+   [{:id :ho_ten
+     :label "Họ và tên ứng viên"
+     :type :text
+     :required true}
+    
+    {:id :kinh_nghiem
+     :label "Số năm kinh nghiệm làm việc"
+     :type :number
+     :required true}
+    
+    ;; Biến địa phương (Local Hidden Var). Chỉ tồn tại trong Vòng 1.
+    {:id :diem_kinh_nghiem
+     :type :hidden
+     :value [:* [:var :kinh_nghiem] 10]}
+    
+    ;; Câu hỏi xuất hiện ngược nhờ biến ẩn thay đổi
+    {:id :cau_hoi_phu_chuyen_gia
+     :label "Bạn có kinh nghiệm > 50 điểm. Hãy kể tên 1 dự án lớn nhất bạn từng làm?"
+     :type :text
+     :required true
+     :show-if [:>= [:var :diem_kinh_nghiem] 50]}]
+     
+   ;; Cập nhật điểm Global khi kết thúc Vòng 1
+   :on-complete [[:set :diem_tong [:+ [:var :diem_tong] [:var :diem_kinh_nghiem]]]
+                 [:print "Đã cộng điểm Vòng 1 vào Tổng điểm!"]]}
+  
+  ;; ================= VÒNG 2 =================
+  {:id :vong_2
+   :on-begin [[:print "Bạn đã bước sang VÒNG 2: Bài test Chuyên môn."]]
+   :fields
+   [{:id :cau_hoi_thu_thach
+     :label "Ngôn ngữ nào chạy trên JVM mà không phải Java?"
+     :type :select
+     :required true
+     :options ["Python" "Clojure" "Go" "Rust"]
+     ;; Sau khi trả lời, tính ngay điểm và cộng vào điểm tổng (Action hook)
+     :actions [[:set :diem_tong [:+ [:var :diem_tong] 
+                                    [:if [:= [:var :cau_hoi_thu_thach] "Clojure"] 50 0]]]]}
+    
+    ;; Thông báo rớt đài
+    {:id :thong_bao_rot
+     :label "⚠️ Rất tiếc, Tổng điểm của bạn quá thấp để đậu vòng này."
+     :type :select
+     :options ["Tôi đồng ý"]
+     :required true
+     :show-if [:< [:var :diem_tong] 100]}]
+     
+   :on-complete [[:set :trang_thai [:if [:>= [:var :diem_tong] 100] "Đã Đậu" "Đã Rớt"]]
+                 [:print "Hoàn tất đánh giá Vòng 2!"]]}]}

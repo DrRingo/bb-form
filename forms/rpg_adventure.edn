@@ -1,0 +1,69 @@
+;; Form RPG Adventure — Bằng chứng về khả năng rẽ nhánh siêu phức tạp bằng EDN
+;; Dùng Flat List + EDN Expressions thay thế hoàn toàn cấu trúc cây cũ
+
+{:title       "Vụ Án Mất Tích"
+ :description "Bạn là thám tử. Mọi lựa chọn đều dẫn đến những câu hỏi khác nhau."
+ :fields
+ [{:id       :ten_tham_tu
+   :label    "Tên của bạn là gì, thám tử?"
+   :type     :text
+   :required true}
+
+  {:id       :do_nghe
+   :label    "Bạn mang theo dụng cụ gì khi tới hiện trường?"
+   :type     :multiselect
+   :required false
+   :options  ["Kính lúp" "Đèn pin" "Súng" "Găng tay cao su"]}
+
+  {:id       :hanh_dong_dau_tien
+   :label    "Cánh cửa căn nhà gỗ đang hé mở. Bạn làm gì?"
+   :type     :select
+   :required true
+   :options  ["Đạp cửa xông vào" "Gõ cửa cẩn thận" "Nhìn qua khe cửa"]}
+
+  ;; -----------------------------------------
+  ;; Rẽ nhánh: Nếu Đạp Cửa
+  ;; -----------------------------------------
+  {:id       :rut_sung
+   :label    "Bên trong tối om, có tiếng động lạ! Bạn có rút súng không?"
+   :type     :select
+   :required true
+   :options  ["Có" "Không"]
+   :show-if  [:and
+               [:= [:var :hanh_dong_dau_tien] "Đạp cửa xông vào"]
+               [:contains? [:var :do_nghe] "Súng"]]}
+
+  {:id       :bi_tan_cong
+   :label    "Bạn không có súng! Một bóng đen lao ra. Bạn làm gì?"
+   :type     :select
+   :required true
+   :options  ["Đỡ đòn" "Bỏ chạy"]
+   :show-if  [:and
+               [:= [:var :hanh_dong_dau_tien] "Đạp cửa xông vào"]
+               [:not [:contains? [:var :do_nghe] "Súng"]]]}
+
+  ;; -----------------------------------------
+  ;; Rẽ nhánh: Nếu Nhìn qua khe cửa
+  ;; -----------------------------------------
+  {:id       :quan_sat_bang_kinh
+   :label    "Dùng kính lúp, bạn phát hiện một vết máu nhỏ trên nắm đấm cửa. Bạn:"
+   :type     :select
+   :required true
+   :options  ["Lấy mẫu máu" "Bỏ qua, đi tiếp"]
+   :show-if  [:and
+               [:= [:var :hanh_dong_dau_tien] "Nhìn qua khe cửa"]
+               [:contains? [:var :do_nghe] "Kính lúp"]]}
+
+  ;; Câu hỏi kết luận phụ thuộc nhiều điều kiện phức tạp
+  {:id       :ket_luan
+   :label    "Tóm lại, bạn nghĩ thủ phạm là ai?"
+   :type     :select
+   :required true
+   :options  ["Người hầu" "Quản gia" "Một con thú hoang" "Chưa đủ bằng chứng"]
+   ;; Hiện ra khi đã vượt qua các hành động đầu tiên và xử lý xong tình huống
+   :show-if  [:or
+               [:= [:var :bi_tan_cong] "Đỡ đòn"]
+               [:= [:var :rut_sung] "Có"]
+               [:= [:var :quan_sat_bang_kinh] "Lấy mẫu máu"]
+               [:= [:var :hanh_dong_dau_tien] "Gõ cửa cẩn thận"]]}
+ ]}

@@ -1,0 +1,129 @@
+;; Khảo sát nhân sự — EDN Flat List format
+{:title       "Khảo Sát Nhân Sự"
+ :description "Thu thập thông tin nhân viên và đánh giá nội bộ"
+
+ :fields
+ [{:id       :ho_ten
+   :label    "Họ và tên đầy đủ"
+   :type     :text
+   :required true}
+
+  {:id       :cap_macbook_pro
+   :label    "🚀 ĐẶC QUYỀN: Nhân sự lập trình Clojure được cấp sẵn Macbook Pro. Bạn có muốn nhận máy của công ty không?"
+   :type     :select
+   :required true
+   :options  ["Có, nhận Macbook Pro" "Không, tôi dùng máy cá nhân"]
+   ;; Điều kiện phụ thuộc ngược vào ngôn ngữ lập trình (câu hỏi tít bên dưới)
+   :show-if  [:= [:var :ngon_ngu_chinh] "Clojure"]}
+
+  {:id         :email_cong_ty
+   :label      "Email công ty"
+   :type       :text
+   :required   true
+   :regex      "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$"
+   :regexError "Email không đúng định dạng. Ví dụ: ten@congty.com"}
+
+  {:id         :ma_nhan_vien
+   :label      "Mã nhân viên (VD: NV001)"
+   :type       :text
+   :required   true
+   :regex      "^NV[0-9]{3,6}$"
+   :regexError "Mã nhân viên phải bắt đầu bằng NV và 3-6 chữ số. Ví dụ: NV001"}
+
+  {:id       :phong_ban
+   :label    "Phòng ban"
+   :type     :select
+   :required true
+   :options  ["Kỹ thuật" "Sản phẩm" "Kinh doanh" "Nhân sự" "Tài chính" "Marketing"]}
+
+  ;; Câu hỏi dành riêng cho Kỹ thuật
+  {:id       :ngon_ngu_chinh
+   :label    "Ngôn ngữ lập trình chính"
+   :type     :select
+   :required true
+   :options  ["Clojure" "Python" "Go" "Rust" "TypeScript" "Khác"]
+   :show-if  [:= [:var :phong_ban] "Kỹ thuật"]}
+
+  {:id       :nam_kinh_nghiem_kt
+   :label    "Số năm kinh nghiệm lập trình"
+   :type     :number
+   :required true
+   :show-if  [:= [:var :phong_ban] "Kỹ thuật"]}
+
+  ;; Câu hỏi dành riêng cho Kinh doanh
+  {:id       :vung_phu_trach
+   :label    "Vùng phụ trách"
+   :type     :select
+   :required true
+   :options  ["Miền Bắc" "Miền Trung" "Miền Nam" "Toàn quốc"]
+   :show-if  [:= [:var :phong_ban] "Kinh doanh"]}
+
+  ;; Câu hỏi dành riêng cho Nhân sự
+  {:id       :chuyen_mon_hr
+   :label    "Chuyên môn HR"
+   :type     :multiselect
+   :required false
+   :options  ["Tuyển dụng" "Đào tạo" "C&B" "Quan hệ lao động"]
+   :show-if  [:= [:var :phong_ban] "Nhân sự"]}
+
+  {:id       :trinh_do_hoc_van
+   :label    "Trình độ học vấn"
+   :type     :select
+   :required true
+   :options  ["Trung cấp / Cao đẳng" "Đại học" "Thạc sĩ" "Tiến sĩ"]}
+
+  ;; Câu hỏi nhánh cho Thạc sĩ
+  {:id       :chuyen_nganh_thac_si
+   :label    "Chuyên ngành Thạc sĩ"
+   :type     :text
+   :required true
+   :show-if  [:= [:var :trinh_do_hoc_van] "Thạc sĩ"]}
+
+  ;; Câu hỏi nhánh cho Tiến sĩ
+  {:id       :chuyen_nganh_tien_si
+   :label    "Chuyên ngành Tiến sĩ"
+   :type     :text
+   :required true
+   :show-if  [:= [:var :trinh_do_hoc_van] "Tiến sĩ"]}
+
+  {:id       :truong_dao_tao
+   :label    "Trường đào tạo"
+   :type     :text
+   :required true
+   :show-if  [:= [:var :trinh_do_hoc_van] "Tiến sĩ"]}
+
+  {:id       :ky_nang
+   :label    "Kỹ năng nổi bật (chọn nhiều)"
+   :type     :multiselect
+   :required false
+   :options  ["Lãnh đạo" "Giao tiếp" "Phân tích dữ liệu" "Ngoại ngữ" "Quản lý dự án" "Sáng tạo"]}
+
+  {:id       :ngoai_ngu_chinh
+   :label    "Ngoại ngữ sử dụng tốt nhất"
+   :type     :select
+   :required true
+   :options  ["Tiếng Anh" "Tiếng Nhật" "Tiếng Trung" "Tiếng Hàn" "Khác"]
+   :show-if  [:contains? [:var :ky_nang] "Ngoại ngữ"]}
+
+  {:id       :ngay_vao_lam
+   :label    "Ngày vào làm"
+   :type     :date
+   :required true}
+
+  {:id       :muc_do_hai_long
+   :label    "Mức độ hài lòng với công việc hiện tại"
+   :type     :select
+   :required true
+   :options  ["Rất hài lòng" "Hài lòng" "Bình thường" "Không hài lòng"]}
+
+  {:id       :ly_do_khong_hai_long
+   :label    "Lý do chính không hài lòng"
+   :type     :select
+   :required true
+   :options  ["Lương thưởng" "Môi trường làm việc" "Cơ hội thăng tiến" "Quản lý" "Khác"]
+   :show-if  [:= [:var :muc_do_hai_long] "Không hài lòng"]}
+
+  {:id       :ghi_chu
+   :label    "Góp ý / Ghi chú thêm (tùy chọn)"
+   :type     :text
+   :required false}]}

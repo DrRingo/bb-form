@@ -1,0 +1,12 @@
+{:selectedByUser
+ {:ho_ten "Nguyen Van B",
+  :ui_score 8,
+  :sys_score 3,
+  :algo_score 4,
+  :devops_score 2,
+  :ket_luan_dau "",
+  :ket_luan_truot ""},
+ :HiddenVar
+ {:analysis_result {},
+  :recommended_role "Đang phân tích",
+  :best_score 0}}

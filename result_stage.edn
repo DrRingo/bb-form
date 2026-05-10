@@ -1,0 +1,7 @@
+{:selectedByUser
+ {:ho_ten "DrRingo",
+  :kinh_nghiem 6,
+  :diem_kinh_nghiem 60,
+  :cau_hoi_phu_chuyen_gia "Hệ thống AI Form",
+  :cau_hoi_thu_thach "Clojure"},
+ :HiddenVar {:diem_tong 110, :trang_thai "Đã Đậu"}}

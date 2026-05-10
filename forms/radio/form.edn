@@ -1,0 +1,36 @@
+{:title       "Radio Search Form"
+ :description "Form to collect user's radio search preferences"
+ :fields
+ [{:id       :station_type
+   :label    "Select station type"
+   :type     :radio
+   :required true
+   :options  ["News" "Music" "Sports" "Talk"]}
+
+  {:id       :news_category
+   :label    "Select news category"
+   :type     :radio
+   :required true
+   :options  ["Local" "World" "Business"]
+   :show-if  [:= [:var :station_type] "News"]}
+
+  {:id       :music_genre
+   :label    "Select music genre"
+   :type     :radio
+   :required true
+   :options  ["Pop" "Rock" "Classical" "Jazz"]
+   :show-if  [:= [:var :station_type] "Music"]}
+
+  {:id       :sports_type
+   :label    "Select sports type"
+   :type     :radio
+   :required true
+   :options  ["Football" "Basketball" "Baseball"]
+   :show-if  [:= [:var :station_type] "Sports"]}
+
+  {:id       :talk_show_host
+   :label    "Select talk show host"
+   :type     :radio
+   :required true
+   :options  ["Host A" "Host B" "Host C"]
+   :show-if  [:= [:var :station_type] "Talk"]}]}

@@ -1,0 +1,12 @@
+{:selectedByUser
+ {:experience 3,
+  :test_score 8,
+  :result_display
+  "✅ TIỀM NĂNG: Xác suất ứng viên này thành công là 69%. (Mức độ tin cậy 95%: dao động từ 41% đến 97%)"},
+ :HiddenVar
+ {:stan_result
+  {:prob 69,
+   :variance 0.02,
+   :lower_bound 41,
+   :upper_bound 97,
+   :confidence "95%"}}}

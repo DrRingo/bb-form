@@ -1,0 +1,33 @@
+;; formulas/cardio_risk.edn
+;; Thư viện tính điểm nguy cơ tim mạch 10 năm (dựa trên Framingham Score)
+
+{:ns      :cardio-risk
+ :version "1.2.0"
+ :author  "Dr. Nguyen Van An"
+
+ :consts
+ {:age-weight      0.49
+  :smoking-penalty 12.0
+  :hdl-bonus       -0.8}
+
+ :fns
+ {:calc-risk
+  ;; Tính điểm rủi ro tổng hợp → trả về float [0.0, 100.0]
+  (fn [age gender bmi smoking hdl-level]
+    (let [base    (* age (:age-weight consts))
+          sex-adj (if (= gender "Nam") 8.0 0.0)
+          bmi-adj (* (- bmi 22) 1.5)
+          smk-adj (if smoking (:smoking-penalty consts) 0.0)
+          hdl-adj (* hdl-level (:hdl-bonus consts))]
+      (-> (+ base sex-adj bmi-adj smk-adj hdl-adj)
+          (max 0.0)
+          (min 100.0))))
+
+  :risk-category
+  ;; Phân loại mức độ nguy hiểm dựa trên điểm tổng
+  (fn [score]
+    (cond
+      (< score 10) :low
+      (< score 20) :moderate
+      (< score 30) :high
+      :else        :very-high))}}
