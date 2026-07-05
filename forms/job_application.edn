@@ -49,10 +49,10 @@
              
   {:id :ket_luan_truot
    :label "⚠️ Rất tiếc, điểm cao nhất của bạn quá thấp để phù hợp với bất kỳ vị trí nào."
-   :type :text
+   :type :info
    :show-if [:< [:var :best_score] 50]}
    
   {:id :ket_luan_dau
    :label "🎉 CHÚC MỪNG! Dựa trên ma trận năng lực, vị trí phù hợp nhất với bạn là {{recommended_role}} với số điểm {{best_score}}/100."
-   :type :text
+   :type :info
    :show-if [:>= [:var :best_score] 50]}]}

@@ -1,12 +1,17 @@
 {:selectedByUser
- {:experience 3,
-  :test_score 5,
-  :result_display
-  "⚠️ CẢNH BÁO CAO: Khả năng ứng viên này phù hợp với công ty chỉ là 45%. (Mức độ tin cậy 95%: dao động từ 17% đến 73%)"},
+ {:loai_hinh_cong_viec "Tự doanh/Kinh doanh tự do",
+  :thu_nhap_thang 10,
+  :giai_trinh_rui_ro "fjlsdfj",
+  :ngay_sinh "2026-02-12",
+  :thong_bao_tu_choi "fjsl",
+  :danh_sach_tai_san [],
+  :lich_su_no_xau "Có, tôi từng bị nợ xấu",
+  :local_asset_value 0,
+  :ho_ten "Medi",
+  :local_du_dieu_kien false,
+  :so_tien_muon_vay 12394,
+  :local_risk_points 50},
  :HiddenVar
- {:stan_result
-  {:prob 45,
-   :variance 0.02,
-   :lower_bound 17,
-   :upper_bound 73,
-   :confidence "95%"}}}
+ {:global_credit_score 50,
+  :global_total_assets 0,
+  :loan_status "Bị Từ Chối"}}
