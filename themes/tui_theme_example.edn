@@ -1,0 +1,5 @@
+{:symbols {:header-prefix "✨ "
+           :prompt-prefix "👉 "
+           :select-cursor "★ "
+           :completed-prefix "✓ "}
+ :layouts {:pause-prompt "Gõ Enter để tiếp tục..."}}

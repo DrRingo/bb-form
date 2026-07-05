@@ -74,18 +74,22 @@ bb-form <form.edn> [OPTIONS]
 |---|---|
 | `--values <file.edn>` | Điền sẵn giá trị từ file EDN (chạy tự động / batch mode) |
 | `--out <file.edn>` | Đường dẫn kết quả (mặc định: `result.edn`) |
+| `--engine <gum|tui|formsmd|winform|web>` | Chọn engine hiển thị giao diện: `gum` (yêu cầu cài đặt Gum, mặc định), `tui` (TUI Clojure gốc qua JLine3), `formsmd` (biên dịch sang Markdown/HTML web của Forms.md), `winform` (placeholder), hoặc `web` (placeholder) |
 
 **Ví dụ:**
 
 ```bash
-# Chạy form tương tác
+# Chạy form tương tác thông thường (dùng engine Gum mặc định)
 bb-form forms/job_application.edn
+
+# Sử dụng engine JLine3 TUI Clojure gốc
+bb-form forms/job_application.edn --engine tui
 
 # Chạy batch tự động
 bb-form forms/job_application.edn --values forms/values.edn --out result.edn
 
-# Ví dụ Bayesian scoring
-bb-form forms/bayesian_recruitment.edn
+# Ví dụ tuyển dụng Bayesian với engine TUI gốc
+bb-form forms/bayesian_recruitment.edn --engine tui
 ```
 
 ---
@@ -229,6 +233,21 @@ bb-form/
 ---
 
 ## 🗓️ Lịch Sử Phiên Bản
+
+### v2.2.0
+- ✅ **Hỗ trợ Web Engine Forms.md (`--engine formsmd`)**:
+  - Hỗ trợ xuất biểu mẫu EDN sang file Markdown-like và file HTML tĩnh tương thích hoàn toàn với web engine Forms.md.
+  - Hỗ trợ xem trước giao diện web thông qua cờ `--serve` (khởi chạy máy chủ httpkit nội bộ tại cổng 8080).
+  - Tích hợp rẽ nhánh cấp độ slide (Stage-level skip logic) sử dụng cú pháp jump condition chuẩn (`-> conditionExpr`).
+  - Hỗ trợ thuộc tính `:form` (`"Email"`, `"Tel"`, `"URL"`, `"Rating"`, v.v.) giúp khai báo các miền nhập liệu chuyên biệt của Forms.md trên web trong khi vẫn bảo toàn khả năng tương thích ngược trên terminal cho các engine Gum và TUI.
+
+### v2.1.0
+- ✅ **Giai đoạn 7**: Ảo hóa giao diện hiển thị & Hỗ trợ TUI JLine3 gốc
+  - Tách rời các logic hiển thị terminal thành bộ điều phối tập trung `com.drbinhthanh.bb-form.core`.
+  - Thêm engine TUI thuần Clojure qua JLine3 (`--engine tui`) hỗ trợ chọn menu bằng phím mũi tên và nhập liệu tương tác không cần cài đặt Gum bên ngoài.
+  - Giữ nguyên khả năng tương thích ngược với engine Charm Gum mặc định (`--engine gum`).
+  - Hỗ trợ các engine placeholder/nháp cho Windows Forms (`winform`) và ứng dụng Web/HTML (`web`).
+  - Sửa lỗi tự động ép kiểu dữ liệu từ tham số dòng lệnh CLI cho các câu hỏi bị bỏ qua (skipped) hoặc điền sẵn (prefilled).
 
 ### v2.0.0
 - ✅ **Giai đoạn 5**: `:import` thư viện công thức (`.edn` & `.clj`) với alias `:as`

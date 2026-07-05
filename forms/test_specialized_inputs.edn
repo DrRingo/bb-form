@@ -1,0 +1,26 @@
+{:title "Kiểm thử Specialized Inputs"
+ :description "Minh họa trường Email, Tel, URL, Rating trong formsmd sử dụng tham số :form"
+ :stages
+ [{:fields
+   [{:id :test_email
+     :type :text
+     :form "Email"
+     :label "Địa chỉ Email của bạn"
+     :required true}
+    {:id :test_tel
+     :type :text
+     :form "Tel"
+     :label "Số điện thoại di động"
+     :required true}
+    {:id :test_url
+     :type :text
+     :form "URL"
+     :label "Link Github cá nhân"
+     :required false}
+    {:id :test_rating
+     :type :number
+     :form "Rating"
+     :label "Đánh giá mức độ hài lòng (1-5 sao)"
+     :min 1
+     :max 5
+     :required true}]}]}

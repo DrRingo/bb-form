@@ -1,0 +1,5 @@
+{:style-args {:header ["gum" "style" "--foreground" "#ff00ff" "--bold" "--border" "rounded"]
+              :info ["gum" "style" "--foreground" "#00ff00" "--italic"]}
+ :symbols {:header-prefix "⭐ "
+           :prompt-prefix "⚡ "}
+ :layouts {:pause-prompt "Nhấn phím bất kỳ..."}}

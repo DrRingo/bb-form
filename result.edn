@@ -1,17 +1,16 @@
 {:selectedByUser
- {:loai_hinh_cong_viec "Tự doanh/Kinh doanh tự do",
-  :thu_nhap_thang 10,
-  :giai_trinh_rui_ro "fjlsdfj",
-  :ngay_sinh "2026-02-12",
-  :thong_bao_tu_choi "fjsl",
-  :danh_sach_tai_san [],
-  :lich_su_no_xau "Có, tôi từng bị nợ xấu",
-  :local_asset_value 0,
-  :ho_ten "Medi",
-  :local_du_dieu_kien false,
-  :so_tien_muon_vay 12394,
-  :local_risk_points 50},
+ {:experience 9,
+  :test_score 7,
+  :result_display
+  "✅ TIỀM NĂNG: Xác suất ứng viên này thành công là 79%. (Mức độ tin cậy 95%: dao động từ 3% đến 100%)"},
  :HiddenVar
- {:global_credit_score 50,
-  :global_total_assets 0,
-  :loan_status "Bị Từ Chối"}}
+ {:stan_result
+  {:samples 4000,
+   :lower_bound 3,
+   :chains 4,
+   :method "MCMC-Stan (cmdstanpy)",
+   :variance 0.0947,
+   :rhat 1.0024,
+   :prob 79,
+   :upper_bound 100,
+   :confidence "95%"}}}

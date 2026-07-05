@@ -11,8 +11,11 @@ Dự án sử dụng **Clojure EDN** (Extensible Data Notation) kết hợp vớ
 Bạn có thể chạy file form thông qua CLI với các tham số hữu ích:
 
 ```bash
-# Chạy cơ bản
+# Chạy cơ bản (mặc định dùng engine gum)
 bb-form form.edn
+
+# Sử dụng engine TUI Clojure gốc (dùng JLine3, không phụ thuộc gum)
+bb-form form.edn --engine tui
 
 # Chạy form, truyền file chứa giá trị mặc định có sẵn (giúp user không phải nhập lại từ đầu)
 bb-form form.edn --values user_data.edn
@@ -243,6 +246,77 @@ Nếu bạn đã dùng `:as :math` khi import, bạn có thể dùng thẳng `:m
   [:set :diem_so_2 [:call :cardio-risk/tinh_toan [:var :a] [:var :b]]]
 ]
 ```
+
+---
+
+## 10. Hệ Thống Engine Hiển Thị (Rendering Engines)
+
+Từ phiên bản `v2.1.0`, `bb-form` đã ảo hoá tầng kết xuất giao diện để hỗ trợ nhiều engine khác nhau. Bạn có thể chỉ định engine chạy bằng cờ `--engine <tên_engine>`:
+
+### 10.1 Engine `gum` (Mặc định)
+- **Cú pháp:** `bb-form form.edn --engine gum`
+- **Đặc điểm:** Sử dụng công cụ dòng lệnh `gum` của hãng Charm. Thích hợp cho môi trường Unix tiêu chuẩn, mang lại giao diện terminal màu sắc và mượt mà.
+- **Yêu cầu:** Cần cài đặt sẵn công cụ `gum` trên hệ thống.
+
+### 10.2 Engine `tui` (Native Clojure TUI)
+- **Cú pháp:** `bb-form form.edn --engine tui`
+- **Đặc điểm:** Sử dụng thư viện `JLine3` được tích hợp sẵn trong Babashka. Giao diện TUI nhẹ hơn, tương tác nhanh, độc lập và không phụ thuộc vào bất kỳ công cụ dòng lệnh nào khác. Rất phù hợp cho các môi trường Docker, CI/CD hoặc máy tính tối giản.
+- **Điều khiển:**
+  - Với câu hỏi nhập văn bản/số/ngày: gõ đáp án bình thường và nhấn `Enter`.
+  - Với câu hỏi chọn lựa (`:select`/`:radio`): dùng phím mũi tên `Lên` / `Xuống` để di chuyển và nhấn `Enter` để chọn.
+  - Với câu hỏi chọn nhiều (`:multiselect`): dùng phím mũi tên `Lên` / `Xuống` để di chuyển, nhấn `Space` để tích chọn/bỏ chọn phần tử, và nhấn `Enter` để xác nhận toàn bộ.
+
+### 10.3 Các Engine Placeholder (`winform` & `web`)
+- Được thiết kế làm khuôn mẫu cho việc biên dịch form sang giao diện Windows Forms (`--engine winform`) hoặc chạy Web server cục bộ kết xuất form dạng HTML/CSS/JS (`--engine web`) trong các giai đoạn phát triển tương lai.
+
+---
+
+## 11. Biên dịch và Xuất sang Forms.md (Web Engine)
+
+Bắt đầu từ phiên bản `v2.2.0`, `bb-form` hỗ trợ biên dịch các biểu mẫu EDN sang định dạng Markdown-like tương thích hoàn chỉnh với **Forms.md** (một web form engine nguồn mở cao cấp). File Markdown kết xuất ra sẽ được nhúng trong một file HTML tĩnh đi kèm, cho phép chạy trực tiếp trên trình duyệt web.
+
+### 11.1 Cách Chạy Xuất sang Forms.md
+
+Để xuất biểu mẫu sang formsmd, sử dụng cờ `--engine formsmd`:
+
+```bash
+# Biên dịch sang file markdown và html trong thư mục exports/
+bb-form forms/job_application.edn --engine formsmd
+
+# Biên dịch và khởi động máy chủ Web cục bộ ở cổng 8080 để xem trước ngay lập tức
+bb-form forms/job_application.edn --engine formsmd --serve
+```
+Hệ thống sẽ tạo ra 2 file trong thư mục `exports/`:
+- `<tên_form>.md`: File Markdown theo chuẩn cú pháp của Forms.md.
+- `<tên_form>.html`: File HTML hoàn chỉnh có nhúng thư viện Forms.md và chứa toàn bộ logic hoạt động.
+
+### 11.2 Các Kiểu Nhập Liệu Chuyên Biệt (`:form`)
+
+Để đảm bảo các biểu mẫu EDN có thể tận dụng các thành phần giao diện web cao cấp của Forms.md (như chọn số sao đánh giá, bàn phím chuyên biệt cho Email/SĐT) mà **không làm phá vỡ tính tương thích ngược** của các engine terminal truyền thống (Gum, TUI), `bb-form` giới thiệu thuộc tính `:form`.
+
+Khi viết form EDN, bạn khai báo `:type` theo các miền cơ bản (`:text`, `:number`), đồng thời khai báo thêm thuộc tính `:form` là một chuỗi mô tả định dạng (không phân biệt chữ hoa/thường):
+
+```clojure
+{:id :test_email
+ :type :text
+ :form "Email"
+ :label "Địa chỉ Email của bạn"}
+```
+
+#### Bảng Ánh Xạ Giữa `:form` và Forms.md Constructors
+
+| Giá trị `:form` | Type nền tảng | Constructor của Forms.md | Hành vi trên Web |
+|:---|:---|:---|:---|
+| `"Email"` | `:text` | `EmailInput` | Kiểm tra định dạng Email chuẩn, hiện bàn phím `@` trên mobile. |
+| `"Tel"` / `"Telephone"` | `:text` | `TelInput` | Hiện bàn phím số điện thoại trên di động. |
+| `"URL"` | `:text` | `URLInput` | Yêu cầu định dạng URL hợp lệ. |
+| `"Password"` | `:text` | `PasswordInput` | Ẩn ký tự nhập (dạng dấu chấm `*`). |
+| `"Rating"` | `:number` | `RatingInput` | Hiển thị giao diện chọn số sao (1-5 sao). |
+| `"OpinionScale"` | `:number` | `OpinionScale` | Hiển thị thang điểm tuyến tính từ bé đến lớn. |
+| `"Datetime"` | `:date` | `DatetimeInput` | Chọn ngày giờ đầy đủ. |
+| `"Time"` | `:date` | `TimeInput` | Chọn giờ (HH:MM). |
+
+*Các engine Gum và TUI sẽ bỏ qua thuộc tính `:form` và dùng `:type` cơ bản kết hợp `:regex` (nếu có) để hoạt động bình thường trên terminal.*
 
 ---
 

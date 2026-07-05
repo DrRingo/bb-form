@@ -1,0 +1,37 @@
+{:title "Biểu mẫu kiểm thử tính năng nâng cao formsmd"
+ :description "Minh họa rẽ nhánh cấp độ slide (Stage show-if) và cảnh báo gọi hàm ngoài"
+ 
+ :variables {:tuoi 0
+             :gioi_tinh "Nam"
+             :diem_sk 0}
+
+ :stages
+ [;; Stage 1: Nhập thông tin cơ bản
+  {:id :stage_basic
+   :fields
+   [{:id :gioi_tinh
+     :label "Chọn giới tính của bạn"
+     :type :select
+     :options ["Nam" "Nữ"]
+     :required true}
+     
+    {:id :tuoi
+     :label "Nhập tuổi của bạn"
+     :type :number
+     :required true}]}
+
+  ;; Stage 2: Chỉ hiển thị cho Nữ >= 18 tuổi (Rẽ nhánh cấp độ Slide)
+  {:id :stage_female_adult
+   :show-if [:and [:= [:var :gioi_tinh] "Nữ"] [:>= [:var :tuoi] 18]]
+   :fields
+   [{:id :thong_tin_phu_nu
+     :label "Thông tin bổ sung dành cho Nữ trưởng thành"
+     :type :text
+     :required true}]}
+
+  ;; Stage 3: Gọi hàm ngoài tính toán chỉ số (Kích hoạt cảnh báo)
+  {:id :stage_health_calc
+   :fields
+   [{:id :diem_sk_hidden
+     :type :hidden
+     :value [:call :cardio-risk/calc-risk [:var :tuoi] 22 [:var :gioi_tinh]]}]}]}

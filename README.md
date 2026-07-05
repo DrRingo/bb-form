@@ -74,18 +74,22 @@ bb-form <form.edn> [OPTIONS]
 |---|---|
 | `--values <file.edn>` | Pre-fill answers from an EDN file (non-interactive / batch mode) |
 | `--out <file.edn>` | Output result path (default: `result.edn`) |
+| `--engine <gum|tui|formsmd|winform|web>` | Select the rendering engine: `gum` (requires Gum, default), `tui` (native Clojure TUI via JLine3), `formsmd` (compiles to Forms.md web Markdown/HTML), `winform` (placeholder), or `web` (placeholder) |
 
 **Examples:**
 
 ```bash
-# Basic interactive form
+# Basic interactive form (using default Gum engine)
 bb-form forms/job_application.edn
+
+# Using the new native Clojure JLine3 TUI engine
+bb-form forms/job_application.edn --engine tui
 
 # Non-interactive batch run
 bb-form forms/job_application.edn --values forms/values.edn --out result.edn
 
-# Bayesian scoring example
-bb-form forms/bayesian_recruitment.edn
+# Bayesian scoring example with native TUI
+bb-form forms/bayesian_recruitment.edn --engine tui
 ```
 
 ---
@@ -210,6 +214,21 @@ bb-form/
 ---
 
 ## 🗓️ Changelog
+
+### v2.2.0
+- ✅ **Forms.md Web Engine (`--engine formsmd`)**:
+  - Compiles EDN forms to Markdown-like templates and static HTML pages compatible with Forms.md engine.
+  - Supports live browser preview with local web server via `--serve` flag (runs httpkit on port 8080).
+  - Handles Stage-level conditional logic using official Forms.md jump condition syntax (`-> conditionExpr`).
+  - Introduced `:form` field property (`"Email"`, `"Tel"`, `"URL"`, `"Rating"`, etc.) for specialized input mapping while retaining terminal backward compatibility.
+
+### v2.1.0
+- ✅ **Phase 7**: UI Engine Virtualization & Native JLine3 TUI support
+  - Decoupled terminal logic into a centralized `com.drbinhthanh.bb-form.core` orchestrator.
+  - Added new native JLine3-based TUI engine (`--engine tui`) supporting arrow key menu selections and interactive text prompts with no external CLI dependencies.
+  - Maintained backward compatibility with default Charm Gum engine (`--engine gum`).
+  - Added draft placeholder engines for Windows Forms (`winform`) and Web/HTML (`web`).
+  - Added automatic type coercion for pre-filled and skipped CLI variables.
 
 ### v2.0.0
 - ✅ **Phase 5**: `:import` formula libraries (`.edn` & `.clj`) with `:as` namespace alias
