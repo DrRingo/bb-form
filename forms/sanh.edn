@@ -1,0 +1,160 @@
+{:title       "Đánh Giá Tình Trạng Chuyển Dạ"
+ :description "Biểu mẫu thu thập thông tin lâm sàng chuyển dạ của sản phụ."
+
+ ;; Import thư viện tính toán số giờ vỡ ối
+ :import [["../formulas/sanh_utils.clj" :as :sanh]]
+
+ :fields
+ [
+  ;; ─────────────────────────────────────────────────────────────────
+  ;; 1. NGÔI THAI
+  ;; ─────────────────────────────────────────────────────────────────
+  {:id       :ngoi_thai
+   :label    "Ngôi thai"
+   :type     :select
+   :options  ["Đầu" "Mông" "Ngang" "Chưa xác định"]
+   :required true}
+
+  ;; ─────────────────────────────────────────────────────────────────
+  ;; 2. ĐỘ MỞ CTC
+  ;; Chỉ hỏi khi ngôi đầu hoặc ngôi mông
+  ;; ─────────────────────────────────────────────────────────────────
+  {:id       :do_mo_ctc
+   :label    "Độ mở CTC"
+   :type     :select
+   :options  ["Đóng" "Mở 2cm" "Mở 3cm" "Mở 4cm" "Mở 5cm"
+              "Mở 6cm" "Mở 7cm" "Mở 8cm" "Gần trọn" "Trọn"]
+   :required true
+   :show-if  [:or [:= [:var :ngoi_thai] "Đầu"]
+                  [:= [:var :ngoi_thai] "Mông"]]}
+
+  ;; ─────────────────────────────────────────────────────────────────
+  ;; 3. ĐỘ XÓA CTC
+  ;; Chỉ hỏi khi độ mở từ 2cm đến 6cm
+  ;; ─────────────────────────────────────────────────────────────────
+  {:id       :do_xoa_ctc
+   :label    "Độ xóa CTC"
+   :type     :select
+   :options  ["50%" "60%" "80%"]
+   :required true
+   :show-if  [:and
+              [:or [:= [:var :ngoi_thai] "Đầu"]
+                   [:= [:var :ngoi_thai] "Mông"]]
+              [:or [:= [:var :do_mo_ctc] "Mở 2cm"]
+                   [:= [:var :do_mo_ctc] "Mở 3cm"]
+                   [:= [:var :do_mo_ctc] "Mở 4cm"]
+                   [:= [:var :do_mo_ctc] "Mở 5cm"]
+                   [:= [:var :do_mo_ctc] "Mở 6cm"]]]}
+
+  ;; ─────────────────────────────────────────────────────────────────
+  ;; 4a. KIỂU THẾ — ngôi đầu
+  ;; Hỏi khi CTC từ 6cm trở lên VÀ ngôi thai là Đầu
+  ;; ─────────────────────────────────────────────────────────────────
+  {:id       :kieu_the_dau
+   :label    "Kiểu thế (Ngôi Đầu)"
+   :type     :select
+   :options  ["Chẩm trái trước" "Chẩm trái sau"
+              "Chẩm phải trước" "Chẩm phải sau"
+              "Chẩm cùng" "Kiểu thế ngang"]
+   :required true
+   :show-if  [:and
+              [:= [:var :ngoi_thai] "Đầu"]
+              [:or [:= [:var :do_mo_ctc] "Mở 6cm"]
+                   [:= [:var :do_mo_ctc] "Mở 7cm"]
+                   [:= [:var :do_mo_ctc] "Mở 8cm"]
+                   [:= [:var :do_mo_ctc] "Gần trọn"]
+                   [:= [:var :do_mo_ctc] "Trọn"]]]}
+
+  ;; ─────────────────────────────────────────────────────────────────
+  ;; 4b. KIỂU THẾ — ngôi mông
+  ;; Hỏi khi CTC từ 6cm trở lên VÀ ngôi thai là Mông
+  ;; ─────────────────────────────────────────────────────────────────
+  {:id       :kieu_the_mong
+   :label    "Kiểu thế (Ngôi Mông)"
+   :type     :select
+   :options  ["Mông thiếu kiểu mông" "Mông thiếu kiểu chân" "Mông đủ"]
+   :required true
+   :show-if  [:and
+              [:= [:var :ngoi_thai] "Mông"]
+              [:or [:= [:var :do_mo_ctc] "Mở 6cm"]
+                   [:= [:var :do_mo_ctc] "Mở 7cm"]
+                   [:= [:var :do_mo_ctc] "Mở 8cm"]
+                   [:= [:var :do_mo_ctc] "Gần trọn"]
+                   [:= [:var :do_mo_ctc] "Trọn"]]]}
+
+  ;; ─────────────────────────────────────────────────────────────────
+  ;; 5. ĐỘ LỌT
+  ;; Hỏi khi CTC gần trọn hoặc trọn
+  ;; ─────────────────────────────────────────────────────────────────
+  {:id         :do_lot
+   :label      "Độ lọt (nhập số từ -2 đến +3)"
+   :type       :number
+   :required   true
+   :regexError "Chỉ nhập số nguyên từ -2 đến +3"
+   :show-if    [:and
+                [:or [:= [:var :ngoi_thai] "Đầu"]
+                     [:= [:var :ngoi_thai] "Mông"]]
+                [:or [:= [:var :do_mo_ctc] "Gần trọn"]
+                     [:= [:var :do_mo_ctc] "Trọn"]]]}
+
+  ;; ─────────────────────────────────────────────────────────────────
+  ;; 6. BƯỚU HUYẾT THANH
+  ;; Hỏi khi CTC gần trọn hoặc trọn
+  ;; ─────────────────────────────────────────────────────────────────
+  {:id       :buou_huyet_thanh
+   :label    "Tình trạng bướu huyết thanh"
+   :type     :select
+   :options  ["Nhỏ" "Trung bình" "Lớn"]
+   :required true
+   :show-if  [:and
+              [:or [:= [:var :ngoi_thai] "Đầu"]
+                   [:= [:var :ngoi_thai] "Mông"]]
+              [:or [:= [:var :do_mo_ctc] "Gần trọn"]
+                   [:= [:var :do_mo_ctc] "Trọn"]]]}
+
+  ;; ─────────────────────────────────────────────────────────────────
+  ;; 7. TÌNH TRẠNG NƯỚC ỐI
+  ;; ─────────────────────────────────────────────────────────────────
+  {:id       :nuoc_oi
+   :label    "Tình trạng nước ối"
+   :type     :select
+   :options  ["Còn" "Đã vỡ"]
+   :required true}
+
+  ;; ─────────────────────────────────────────────────────────────────
+  ;; 8. NGÀY GIỜ VỠ ỐI
+  ;; Hỏi khi đã vỡ ối; định dạng DD-MM-YYYY HH:mm
+  ;; ─────────────────────────────────────────────────────────────────
+  {:id         :gio_vo_oi
+   :label      "Ngày giờ vỡ ối (DD-MM-YYYY HH:mm)"
+   :type       :datetime
+   :form       "Datetime"
+   :required   true
+   :show-if    [:= [:var :nuoc_oi] "Đã vỡ"]}
+
+  ;; ─────────────────────────────────────────────────────────────────
+  ;; 9. HIỂN THỊ SỐ GIỜ VỠ ỐI (info — tính toán động)
+  ;; ─────────────────────────────────────────────────────────────────
+  {:id    :so_gio_vo_oi
+   :type  :info
+   :label "⏱️  Số giờ vỡ ối đến hiện tại: {{[:call :sanh/tinh-gio-vo-oi [:var :gio_vo_oi]]}} giờ"
+   :show-if [:= [:var :nuoc_oi] "Đã vỡ"]}
+
+  ;; ─────────────────────────────────────────────────────────────────
+  ;; 10. TÌNH TRẠNG KHUNG CHẬU
+  ;; ─────────────────────────────────────────────────────────────────
+  {:id       :khung_chau
+   :label    "Tình trạng khung chậu"
+   :type     :select
+   :options  ["Hẹp" "Giới hạn" "Bình thường"]
+   :required true}
+
+  ;; ─────────────────────────────────────────────────────────────────
+  ;; 11. ƯỚC LƯỢNG CÂN NẶNG THAI NHI
+  ;; ─────────────────────────────────────────────────────────────────
+  {:id         :can_nang_thai
+   :label      "Ước lượng cân nặng thai nhi (gram, từ 500 đến 6000)"
+   :type       :number
+   :required   true
+   :regexError "Nhập số gram hợp lý từ 500 đến 6000"}
+ ]}

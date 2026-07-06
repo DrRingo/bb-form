@@ -184,7 +184,7 @@ Dưới đây là một bộ khung đầy đủ của một field thông thườ
 ```clojure
 {:id       :id_bien_du_lieu      ; (Bắt buộc) Tên biến lưu vào kết quả
  :label    "Nội dung câu hỏi"    ; (Bắt buộc) Nội dung hiển thị
- :type     :text                 ; (Bắt buộc) Loại: text, number, date, select, multiselect, hidden
+ :type     :text                 ; (Bắt buộc) Loại: text, number, date, datetime, time, select, multiselect, hidden
  :required true                  ; Có bắt buộc trả lời không
  :options  ["A" "B" "C"]         ; (Dùng cho select/multiselect)
  
@@ -313,8 +313,8 @@ Khi viết form EDN, bạn khai báo `:type` theo các miền cơ bản (`:text`
 | `"Password"` | `:text` | `PasswordInput` | Ẩn ký tự nhập (dạng dấu chấm `*`). |
 | `"Rating"` | `:number` | `RatingInput` | Hiển thị giao diện chọn số sao (1-5 sao). |
 | `"OpinionScale"` | `:number` | `OpinionScale` | Hiển thị thang điểm tuyến tính từ bé đến lớn. |
-| `"Datetime"` | `:date` | `DatetimeInput` | Chọn ngày giờ đầy đủ. |
-| `"Time"` | `:date` | `TimeInput` | Chọn giờ (HH:MM). |
+| `"Datetime"` | `:datetime` | `DatetimeInput` | Chọn ngày giờ đầy đủ. |
+| `"Time"` | `:datetime` | `TimeInput` | Chọn giờ (HH:MM). |
 
 *Các engine Gum và TUI sẽ bỏ qua thuộc tính `:form` và dùng `:type` cơ bản kết hợp `:regex` (nếu có) để hoạt động bình thường trên terminal.*
 

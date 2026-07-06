@@ -127,7 +127,8 @@ Form là một EDN map. Ví dụ tối giản:
 |---|---|
 | `:text` | Nhập văn bản, hỗ trợ `:regex` validation |
 | `:number` | Nhập số nguyên |
-| `:date` | Nhập ngày (DD-MM-YYYY) với gõ tắt |
+| `:date` | Nhập ngày (DD-MM-YYYY) với gõ tắt (`DD`, `DDMM`, `DDMMYYYY`, `DD[+-]N`, `DDMM[+-]N`) |
+| `:datetime` | Nhập ngày giờ (DD-MM-YYYY HH:MM) với gõ tắt (hỗ trợ cả gõ tắt riêng giờ) |
 | `:select` | Chọn một lựa chọn (dropdown) |
 | `:multiselect` | Chọn nhiều lựa chọn |
 | `:hidden` | Giá trị tính toán, không hiển thị |

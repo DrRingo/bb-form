@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>test_flow - Forms.md</title>
+    <title>test_datetime - Forms.md</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,300..700;1,14..32,300..700&display=swap" rel="stylesheet">
@@ -48,39 +48,24 @@
     <script src="https://cdn.jsdelivr.net/npm/formsmd/dist/js/formsmd.bundle.min.js"></script>
     <script>
         const template = `
-#! id = test_flow
+#! id = test_datetime
 
 -> start -> Bắt đầu
-# Biểu mẫu kiểm thử tính năng nâng cao formsmd
-Minh họa rẽ nhánh cấp độ slide (Stage show-if) và cảnh báo gọi hàm ngoài
+# Khảo Sát Thời Gian (Test Datetime & Time)
+Biểu mẫu dùng để kiểm thử tính năng nhập ngày, giờ, ngày giờ và các ký hiệu viết tắt.
 ---
 
-:::
-{% set tuoi = 0 %}
-{% set gioi_tinh = "Nam" %}
-{% set diem_sk = 0 %}
-:::
-
-gioi_tinh* = SelectBox(
-  | question = Chọn giới tính của bạn
-  | options = Nam, Nữ
+ngay_sinh* = DateInput(
+  | question = 1. Nhập ngày sinh của bạn (date)
 )
 
-tuoi* = NumberInput(
-  | question = Nhập tuổi của bạn
+thoi_gian_ruong* = DatetimeInput(
+  | question = 2. Thời gian bạn đi ngủ tối qua (datetime)
 )
----
 
--> (gioi_tinh == "Nữ" and tuoi >= 18)
-
-thong_tin_phu_nu* = TextInput(
-  | question = Thông tin bổ sung dành cho Nữ trưởng thành
+gio_trua* = TimeInput(
+  | question = 3. Giờ nghỉ trưa mong muốn (time)
 )
----
-
-::: [{$ gioi_tinh tuoi $}]
-{% set diem_sk_hidden = cardio_risk.calc_risk(tuoi, 22, gioi_tinh) %}
-:::
 ---
 -> end
 # Cảm ơn bạn!

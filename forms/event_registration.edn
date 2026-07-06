@@ -11,12 +11,14 @@
   {:id         :email
    :label      "Email liên lạc"
    :type       :text
+   :form  "email"
    :required   true
    :regex      "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$"
    :regexError "Email không hợp lệ"}
 
   {:id         :so_dien_thoai
    :label      "Số điện thoại"
+   :form "tel"
    :type       :text
    :required   false
    :regex      "^[0-9]{10,11}$"
@@ -48,8 +50,8 @@
    :type     :text
    :required true
    :show-if  [:and
-               [:= [:var :loai_ve] "Tham dự trực tiếp"]
-               [:= [:var :can_xe_dua_don] "Có"]]}
+              [:= [:var :loai_ve] "Tham dự trực tiếp"]
+              [:= [:var :can_xe_dua_don] "Có"]]}
 
   {:id       :chu_de_quan_tam
    :label    "Chủ đề quan tâm (chọn nhiều)"

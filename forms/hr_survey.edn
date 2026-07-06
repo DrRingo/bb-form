@@ -20,6 +20,7 @@
    :label      "Email công ty"
    :type       :text
    :required   true
+   :form "email"
    :regex      "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$"
    :regexError "Email không đúng định dạng. Ví dụ: ten@congty.com"}
 

@@ -102,19 +102,6 @@
 (defn get-prefilled [id]
   (get-in @answers [:selectedByUser (keyword id)]))
 
-(defn parse-value [v type]
-  (case type
-    ("number" :number) (try (Integer/parseInt (str v)) (catch Exception _ v))
-    ("text" :text)     (str v)
-    ("date" :date)     (let [s (str v)]
-                         (if (re-matches #"^\d{2}-\d{2}-\d{4}$" s)
-                           (try
-                             (let [dt (java.time.LocalDate/parse s (java.time.format.DateTimeFormatter/ofPattern "dd-MM-yyyy"))]
-                               (.format dt (java.time.format.DateTimeFormatter/ofPattern "yyyy-MM-dd")))
-                             (catch Exception _ s))
-                           s))
-    v))
-
 (defn today []
   (let [now (java.time.LocalDate/now)]
     (.format now (java.time.format.DateTimeFormatter/ofPattern "dd-MM-yyyy"))))
@@ -128,15 +115,53 @@
   (let [trimmed (str/trim input)
         {:keys [month year]} (current-month-year)]
     (cond
-      (re-matches #"^\d{2}$" trimmed)
-      (let [dd (Integer/parseInt trimmed)]
-        (format "%02d-%02d-%d" dd month year))
+      ;; 8 digits: DDMMYYYY
+      (re-matches #"^\d{8}$" trimmed)
+      (let [dd (subs trimmed 0 2)
+            mm (subs trimmed 2 4)
+            yyyy (subs trimmed 4 8)]
+        (format "%s-%s-%s" dd mm yyyy))
+
+      ;; DDMM[+-]N (e.g. 2304-1)
+      (re-matches #"^(\d{2})(\d{2})([+-])(\d+)$" trimmed)
+      (let [[_ dd-str mm-str sign-str n-str] (re-matches #"^(\d{2})(\d{2})([+-])(\d+)$" trimmed)
+            dd (Integer/parseInt dd-str)
+            mm (Integer/parseInt mm-str)
+            n (Integer/parseInt n-str)
+            resolved-year (if (= sign-str "+") (+ year n) (- year n))]
+        (format "%02d-%02d-%d" dd mm resolved-year))
+
+      ;; DD[+-]N (e.g. 23+10)
+      (re-matches #"^(\d{2})([+-])(\d+)$" trimmed)
+      (let [[_ dd-str sign-str n-str] (re-matches #"^(\d{2})([+-])(\d+)$" trimmed)
+            dd (Integer/parseInt dd-str)
+            n (Integer/parseInt n-str)
+            max-len (-> (java.time.YearMonth/of year month) .lengthOfMonth)
+            clamped-dd (max 1 (min dd max-len))
+            base-date (java.time.LocalDate/of year month clamped-dd)
+            resolved-date (if (= sign-str "+")
+                            (.plusDays base-date n)
+                            (.minusDays base-date n))
+            resolved-day (.getDayOfMonth resolved-date)
+            resolved-month (.getMonthValue resolved-date)
+            resolved-year (.getYear resolved-date)]
+        (format "%02d-%02d-%d" resolved-day resolved-month resolved-year))
+
+      ;; DDMM (e.g. 2304)
       (re-matches #"^\d{4}$" trimmed)
       (let [dd (Integer/parseInt (subs trimmed 0 2))
             mm (Integer/parseInt (subs trimmed 2 4))]
         (format "%02d-%02d-%d" dd mm year))
+
+      ;; DD (e.g. 23)
+      (re-matches #"^\d{2}$" trimmed)
+      (let [dd (Integer/parseInt trimmed)]
+        (format "%02d-%02d-%d" dd month year))
+
+      ;; DD-MM-YYYY or DD/MM/YYYY
       (re-matches #"^\d{2}[-/]\d{2}[-/]\d{4}$" trimmed)
       (str/replace trimmed #"[/]" "-")
+
       :else trimmed)))
 
 (defn valid-date? [date-str]
@@ -152,6 +177,99 @@
       (and (<= 1 d max-day)))
     false))
 
+(defn valid-time-str? [time-str]
+  (if-let [m (re-matches #"^(?i)(?:h)?(\d{1,2})(?:[h:])?(\d{2})(?:[+-]\d+)?$" time-str)]
+    (let [h (Integer/parseInt (nth m 1))
+          min (Integer/parseInt (nth m 2))]
+      (and (<= 0 h 23) (<= 0 min 59)))
+    false))
+
+(defn valid-datetime-input? [input type]
+  (let [trimmed (str/trim (or input ""))
+        parts (if (str/blank? trimmed) [] (str/split trimmed #"\s+"))]
+    (cond
+      (str/blank? trimmed) true
+      
+      (= (count parts) 2)
+      (let [d-part (first parts)
+            t-part (second parts)]
+        (and (valid-date? (expand-date-shortcut d-part))
+             (valid-time-str? t-part)))
+             
+      (= (count parts) 1)
+      (let [p (first parts)]
+        (if (or (str/includes? p ":")
+                (str/includes? p "h")
+                (str/includes? p "H"))
+          (and (#{:datetime "datetime"} (keyword type))
+               (valid-time-str? p))
+          (and (#{:date :datetime "date" "datetime"} (keyword type))
+               (valid-date? (expand-date-shortcut p)))))
+               
+      :else false)))
+
+(defn normalize-datetime [input type]
+  (let [trimmed (str/trim (or input ""))
+        parts (if (str/blank? trimmed) [] (str/split trimmed #"\s+"))
+        {:keys [date-str time-str]}
+        (cond
+          (= (count parts) 2)
+          {:date-str (first parts) :time-str (second parts)}
+          
+          (= (count parts) 1)
+          (let [p (first parts)]
+            (if (or (str/includes? p ":")
+                    (str/includes? p "h")
+                    (str/includes? p "H"))
+              {:date-str nil :time-str p}
+              {:date-str p :time-str nil}))
+              
+          :else
+          {:date-str nil :time-str nil})
+          
+        time-pattern #"^(?i)(?:h)?(\d{1,2})(?:[h:])?(\d{2})(?:([+-])(\d+))?$"
+        time-match (when time-str (re-matches time-pattern time-str))
+        
+        [hour min sign offset-days]
+        (if time-match
+          (let [[_ h-str m-str sgn-str off-str] time-match]
+            [(Integer/parseInt h-str)
+             (Integer/parseInt m-str)
+             sgn-str
+             (if off-str (Integer/parseInt off-str) 0)])
+          (if (and (= (keyword type) :date) (not time-str))
+            [0 0 nil 0]
+            (let [now (java.time.LocalTime/now)]
+              [(.getHour now) (.getMinute now) nil 0])))
+              
+        resolved-date-str (if date-str
+                            (expand-date-shortcut date-str)
+                            (today))
+        
+        base-date (try
+                    (if (re-matches #"^\d{4}-\d{2}-\d{2}$" resolved-date-str)
+                      (java.time.LocalDate/parse resolved-date-str (java.time.format.DateTimeFormatter/ofPattern "yyyy-MM-dd"))
+                      (java.time.LocalDate/parse resolved-date-str (java.time.format.DateTimeFormatter/ofPattern "dd-MM-yyyy")))
+                    (catch Exception _
+                      (java.time.LocalDate/now)))
+                      
+        final-date (if (and sign (> offset-days 0))
+                     (if (= sign "-")
+                       (.minusDays base-date offset-days)
+                       (.plusDays base-date offset-days))
+                     base-date)
+                     
+        formatted-date (.format final-date (java.time.format.DateTimeFormatter/ofPattern "yyyy-MM-dd"))
+        formatted-time (format "%02d:%02d" hour min)]
+    (str formatted-date " " formatted-time)))
+
+(defn parse-value [v type]
+  (case type
+    ("number" :number)     (try (Integer/parseInt (str v)) (catch Exception _ v))
+    ("text" :text)         (str v)
+    ("date" :date)         (normalize-datetime v :date)
+    ("datetime" :datetime) (normalize-datetime v :datetime)
+    v))
 (defn ->pattern [regex]
   (cond
     (instance? java.util.regex.Pattern regex) regex

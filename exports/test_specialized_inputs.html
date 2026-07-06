@@ -37,16 +37,72 @@
 <body>
     <div id="form-container"></div>
 
-    <!-- Custom JS functions (defined by :import in bb-form) -->
-    <!-- Add any external window.namespace.functionName definitions here -->
-    <script>
-        // Placeholder: bb-form detected external :call references.
-        // Define your custom functions here if needed:
-        // window.my_namespace = { my_function: function(a, b) { ... } };
-    </script>
-
     <script src="https://cdn.jsdelivr.net/npm/formsmd/dist/js/formsmd.bundle.min.js"></script>
     <script>
+        // Monkey-patch nunjucks.renderString to inject setVal helper
+        const origRenderString = nunjucks.renderString;
+        let reRenderQueue = new Set();
+        let isReRendering = false;
+
+        nunjucks.renderString = function(str, ctx) {
+            if (ctx) {
+                ctx.setVal = function(name, val) {
+                    if (window.currentFormsmdInstance) {
+                        const oldVal = window.currentFormsmdInstance.state.formData[name];
+                        if (oldVal !== val) {
+                            window.currentFormsmdInstance.state.formData[name] = val;
+                            reRenderQueue.add(name);
+                        }
+                    }
+                    return "";
+                };
+            }
+            return origRenderString.call(this, str, ctx);
+        };
+
+        // Monkey-patch reRenderBindElems to process queue and prevent loops
+        const origReRender = Formsmd.prototype.reRenderBindElems;
+        Formsmd.prototype.reRenderBindElems = function(name) {
+            if (isReRendering) {
+                origReRender.call(this, name);
+                return;
+            }
+            isReRendering = true;
+            try {
+                origReRender.call(this, name);
+                // Flush the queue of modified calculated variables
+                while (reRenderQueue.size > 0) {
+                    const queue = Array.from(reRenderQueue);
+                    reRenderQueue.clear();
+                    for (const v of queue) {
+                        origReRender.call(this, v);
+                    }
+                }
+            } finally {
+                isReRendering = false;
+            }
+        };
+
+        // Monkey-patch setFormDataToState to also flush the queue
+        const origSetFormDataToState = Formsmd.prototype.setFormDataToState;
+        Formsmd.prototype.setFormDataToState = function() {
+            origSetFormDataToState.call(this);
+            if (!isReRendering) {
+                isReRendering = true;
+                try {
+                    while (reRenderQueue.size > 0) {
+                        const queue = Array.from(reRenderQueue);
+                        reRenderQueue.clear();
+                        for (const v of queue) {
+                            origReRender.call(this, v);
+                        }
+                    }
+                } finally {
+                    isReRendering = false;
+                }
+            }
+        };
+
         const template = `
 #! id = test_specialized_inputs
 
@@ -80,6 +136,7 @@ Thông tin đăng ký của bạn đã được ghi nhận.
         const formsmd = new Formsmd(template, document.getElementById("form-container"), {
             colorScheme: "light"
         });
+        window.currentFormsmdInstance = formsmd;
         formsmd.init();
     </script>
 </body>

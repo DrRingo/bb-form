@@ -76,7 +76,7 @@ kinh_nghiem* = NumberInput(
 :::
 
 ::: [{$ diem_kinh_nghiem $}]
-{% if (diem_kinh_nghiem >= 50) %}
+{% if diem_kinh_nghiem >= 50 %}
 cau_hoi_phu_chuyen_gia* = TextInput(
   | question = Bạn có kinh nghiệm > 50 điểm. Hãy kể tên 1 dự án lớn nhất bạn từng làm?
 )
@@ -93,22 +93,22 @@ cau_hoi_phu_chuyen_gia* = TextInput(
 :::
 cau_hoi_thu_thach* = SelectBox(
   | question = Ngôn ngữ nào chạy trên JVM mà không phải Java?
-  | choices = Python, Clojure, Go, Rust
+  | options = Python, Clojure, Go, Rust
 )
 ::: [{$ cau_hoi_thu_thach $}]
-{% set diem_tong = (diem_tong + ((cau_hoi_thu_thach == "Clojure") ? 50 : 0)) %}
+{% set diem_tong = (diem_tong + (50 if cau_hoi_thu_thach == "Clojure" else 0)) %}
 :::
 
 ::: [{$ diem_tong $}]
-{% if (diem_tong < 100) %}
+{% if diem_tong < 100 %}
 thong_bao_rot* = SelectBox(
   | question = ⚠️ Rất tiếc, Tổng điểm của bạn quá thấp để đậu vòng này.
-  | choices = Tôi đồng ý
+  | options = Tôi đồng ý
 )
 {% endif %}
 :::
 :::
-{% set trang_thai = ((diem_tong >= 100) ? "Đã Đậu" : "Đã Rớt") %}
+{% set trang_thai = ("Đã Đậu" if diem_tong >= 100 else "Đã Rớt") %}
 <p class="text-muted">📢 Hoàn tất đánh giá Vòng 2!</p>
 :::
 ---

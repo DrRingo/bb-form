@@ -1,0 +1,12 @@
+{:title "Khảo Sát Thời Gian (Test Datetime)"
+ :description "Biểu mẫu dùng để kiểm thử tính năng nhập ngày, ngày giờ và các ký hiệu viết tắt."
+ :fields
+ [{:id :ngay_sinh
+   :label "1. Nhập ngày sinh của bạn (date)"
+   :type :date
+   :required true}
+
+  {:id :thoi_gian_ruong
+   :label "2. Thời gian bạn đi ngủ tối qua (datetime)"
+   :type :datetime
+   :required true}]}

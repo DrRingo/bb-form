@@ -127,7 +127,8 @@ A form is an EDN map. Minimal example:
 |---|---|
 | `:text` | Text input with optional `:regex` validation |
 | `:number` | Integer input |
-| `:date` | Date input (DD-MM-YYYY) with shortcuts |
+| `:date` | Date input (DD-MM-YYYY) with shortcuts (`DD`, `DDMM`, `DDMMYYYY`, `DD[+-]N`, `DDMM[+-]N`) |
+| `:datetime` | Datetime input (DD-MM-YYYY HH:MM) with shortcuts (including time-only inputs) |
 | `:select` | Single-choice dropdown |
 | `:multiselect` | Multiple-choice selection |
 | `:hidden` | Computed value, not displayed |

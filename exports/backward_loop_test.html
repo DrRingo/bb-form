@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>bayesian_recruitment - Forms.md</title>
+    <title>backward_loop_test - Forms.md</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,300..700;1,14..32,300..700&display=swap" rel="stylesheet">
@@ -104,35 +104,29 @@
         };
 
         const template = `
-#! id = bayesian_recruitment
+#! id = backward_loop_test
 
 -> start -> Bắt đầu
-# Bayesian Recruitment Engine (Phase 6)
-Sử dụng Backend Stan để dự đoán khả năng trúng tuyển của ứng viên kèm theo mức độ bất định (uncertainty).
+# Backward Loop Test
+Kiểm thử cơ chế Restarting Loop với câu hỏi phụ thuộc ngược (Backward Dependency)
 ---
 
-:::
-{% set stan_result = {} %}{{ setVal("stan_result", stan_result) }}
-:::
-
-experience* = NumberInput(
-  | question = Số năm kinh nghiệm làm việc?
+::: [{$ tham_gia $}]
+{% if tham_gia == "Không" %}
+ly_do_tu_choi* = TextInput(
+  | question = Vì sao bạn từ chối tham gia?
 )
-
-test_score* = NumberInput(
-  | question = Điểm bài test kỹ năng (1-10)
-)
-::: [{$ test_score $}]
-{% set stan_result = stan.run_stan_model(experience, test_score) %}{{ setVal("stan_result", stan_result) }}
-:::
-
-::: [{$ stan_result $}]
-{% if stan_result.'prob' < 50 %}
-⚠️ CẢNH BÁO CAO: Khả năng ứng viên này phù hợp với công ty chỉ là {{ stan_result.'prob' }}%. (Mức độ tin cậy {{ stan_result.'confidence' }}: dao động từ {{ stan_result.'lower_bound' }}% đến {{ stan_result.'upper_bound' }}%)
-{% else %}
-✅ TIỀM NĂNG: Xác suất ứng viên này thành công là {{ stan_result.'prob' }}%. (Mức độ tin cậy {{ stan_result.'confidence' }}: dao động từ {{ stan_result.'lower_bound' }}% đến {{ stan_result.'upper_bound' }}%)
 {% endif %}
 :::
+
+ho_ten* = TextInput(
+  | question = Họ và tên
+)
+
+tham_gia* = SelectBox(
+  | question = Bạn có muốn tham gia sự kiện không?
+  | options = Có, Không
+)
 ---
 -> end
 # Cảm ơn bạn!

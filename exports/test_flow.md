@@ -13,7 +13,7 @@ Minh họa rẽ nhánh cấp độ slide (Stage show-if) và cảnh báo gọi h
 
 gioi_tinh* = SelectBox(
   | question = Chọn giới tính của bạn
-  | choices = Nam, Nữ
+  | options = Nam, Nữ
 )
 
 tuoi* = NumberInput(
@@ -21,7 +21,7 @@ tuoi* = NumberInput(
 )
 ---
 
--> ((gioi_tinh == "Nữ") and (tuoi >= 18))
+-> (gioi_tinh == "Nữ" and tuoi >= 18)
 
 thong_tin_phu_nu* = TextInput(
   | question = Thông tin bổ sung dành cho Nữ trưởng thành

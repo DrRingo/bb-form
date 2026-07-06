@@ -28,23 +28,27 @@
         :and     (str "(" (str/join " and " (map compile-expr args)) ")")
         :or      (str "(" (str/join " or "  (map compile-expr args)) ")")
         :not     (str "not (" (compile-expr (first args)) ")")
-        :=       (str "(" (compile-expr (first args)) " == "  (compile-expr (second args)) ")")
-        :!=      (str "(" (compile-expr (first args)) " != "  (compile-expr (second args)) ")")
-        :>       (str "(" (compile-expr (first args)) " > "   (compile-expr (second args)) ")")
-        :<       (str "(" (compile-expr (first args)) " < "   (compile-expr (second args)) ")")
-        :>=      (str "(" (compile-expr (first args)) " >= "  (compile-expr (second args)) ")")
-        :<=      (str "(" (compile-expr (first args)) " <= "  (compile-expr (second args)) ")")
-        :if      (str "(" (compile-expr (first args)) " ? "
-                         (compile-expr (second args)) " : "
+        :=       (str (compile-expr (first args)) " == "  (compile-expr (second args)))
+        :!=      (str (compile-expr (first args)) " != "  (compile-expr (second args)))
+        :>       (str (compile-expr (first args)) " > "   (compile-expr (second args)))
+        :<       (str (compile-expr (first args)) " < "   (compile-expr (second args)))
+        :>=      (str (compile-expr (first args)) " >= "  (compile-expr (second args)))
+        :<=      (str (compile-expr (first args)) " <= "  (compile-expr (second args)))
+        :if      (str "(" (compile-expr (second args)) " if "
+                         (compile-expr (first args)) " else "
                          (compile-expr (nth args 2)) ")")
         :+       (str "(" (str/join " + " (map compile-expr args)) ")")
         :-       (str "(" (str/join " - " (map compile-expr args)) ")")
         :*       (str "(" (str/join " * " (map compile-expr args)) ")")
         :/       (str "(" (str/join " / " (map compile-expr args)) ")")
-        :contains?    (str (compile-expr (first args)) " contains " (compile-expr (second args)))
+        :contains?    (let [coll (compile-expr (first args))
+                            item (compile-expr (second args))]
+                        (str "(" coll " and (" item " in " coll "))"))
         :count        (str "(" (compile-expr (first args)) " | length)")
         :first        (str (compile-expr (first args)) "[0]")
-        :str/includes?   (str (compile-expr (first args)) " contains " (compile-expr (second args)))
+        :str/includes?   (let [coll (compile-expr (first args))
+                               item (compile-expr (second args))]
+                           (str "(" coll " and (" item " in " coll "))"))
         :str/lower-case  (str "(" (compile-expr (first args)) " | lower)")
         :str/upper-case  (str "(" (compile-expr (first args)) " | upper)")
         :call (let [func      (first args)
@@ -161,6 +165,7 @@
                               :text        "TextInput"
                               :number      "NumberInput"
                               :date        "DateInput"
+                              :datetime    "DatetimeInput"
                               :select      "SelectBox"
                               :radio       "ChoiceInput"
                               :multiselect "ChoiceInput"
@@ -174,7 +179,8 @@
                  min         (conj (str "min = "         min))
                  max         (conj (str "max = "         max))
                  step        (conj (str "step = "        step))
-                 options     (conj (str "choices = "     (str/join ", " (map core/normalize-str options))))
+                 options     (conj (str (if (= constructor "SelectBox") "options = " "choices = ")
+                                         (str/join ", " (map core/normalize-str options))))
                  (= (keyword type) :multiselect) (conj "multiple = true"))]
     (if constructor
       (str id-str req-str " = " constructor "(\n"

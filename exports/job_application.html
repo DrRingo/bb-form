@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>bayesian_recruitment - Forms.md</title>
+    <title>job_application - Forms.md</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,300..700;1,14..32,300..700&display=swap" rel="stylesheet">
@@ -104,33 +104,53 @@
         };
 
         const template = `
-#! id = bayesian_recruitment
+#! id = job_application
 
 -> start -> Bắt đầu
-# Bayesian Recruitment Engine (Phase 6)
-Sử dụng Backend Stan để dự đoán khả năng trúng tuyển của ứng viên kèm theo mức độ bất định (uncertainty).
+# Hệ thống Phân Tích Kỹ Năng Ứng Viên (Matrix Score)
+Form sử dụng thư viện tính toán ma trận bằng Clojure (.clj) để phân loại ứng viên.
 ---
 
 :::
-{% set stan_result = {} %}{{ setVal("stan_result", stan_result) }}
+{% set analysis_result = {} %}{{ setVal("analysis_result", analysis_result) }}
+{% set recommended_role = "Đang phân tích" %}{{ setVal("recommended_role", recommended_role) }}
+{% set best_score = 0 %}{{ setVal("best_score", best_score) }}
 :::
 
-experience* = NumberInput(
-  | question = Số năm kinh nghiệm làm việc?
+ho_ten* = TextInput(
+  | question = Họ và tên ứng viên
 )
 
-test_score* = NumberInput(
-  | question = Điểm bài test kỹ năng (1-10)
+ui_score* = NumberInput(
+  | question = 1. Tự đánh giá kỹ năng UI/UX (0-10)
 )
-::: [{$ test_score $}]
-{% set stan_result = stan.run_stan_model(experience, test_score) %}{{ setVal("stan_result", stan_result) }}
+
+sys_score* = NumberInput(
+  | question = 2. Tự đánh giá kỹ năng System Design (0-10)
+)
+
+algo_score* = NumberInput(
+  | question = 3. Tự đánh giá kỹ năng Thuật Toán (0-10)
+)
+
+devops_score* = NumberInput(
+  | question = 4. Tự đánh giá kỹ năng DevOps/Deployment (0-10)
+)
+::: [{$ devops_score $}]
+{% set analysis_result = score.analyze_candidate(ui_score, sys_score, algo_score, devops_score) %}{{ setVal("analysis_result", analysis_result) }}
+{% set recommended_role = score.get_recommended_role(analysis_result) %}{{ setVal("recommended_role", recommended_role) }}
+{% set best_score = score.get_best_score(analysis_result) %}{{ setVal("best_score", best_score) }}
 :::
 
-::: [{$ stan_result $}]
-{% if stan_result.'prob' < 50 %}
-⚠️ CẢNH BÁO CAO: Khả năng ứng viên này phù hợp với công ty chỉ là {{ stan_result.'prob' }}%. (Mức độ tin cậy {{ stan_result.'confidence' }}: dao động từ {{ stan_result.'lower_bound' }}% đến {{ stan_result.'upper_bound' }}%)
-{% else %}
-✅ TIỀM NĂNG: Xác suất ứng viên này thành công là {{ stan_result.'prob' }}%. (Mức độ tin cậy {{ stan_result.'confidence' }}: dao động từ {{ stan_result.'lower_bound' }}% đến {{ stan_result.'upper_bound' }}%)
+::: [{$ best_score $}]
+{% if best_score < 50 %}
+⚠️ Rất tiếc, điểm cao nhất của bạn quá thấp để phù hợp với bất kỳ vị trí nào.
+{% endif %}
+:::
+
+::: [{$ best_score $}]
+{% if best_score >= 50 %}
+🎉 CHÚC MỪNG! Dựa trên ma trận năng lực, vị trí phù hợp nhất với bạn là {$ recommended_role $} với số điểm {$ best_score $}/100.
 {% endif %}
 :::
 ---

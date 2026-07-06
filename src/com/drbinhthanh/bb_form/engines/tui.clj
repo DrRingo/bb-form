@@ -219,7 +219,7 @@
         value (if (core/should-skip? id)
                 (core/get-prefilled id)
                 (loop []
-                  (let [v (tui-input (str resolved-label " (DD-MM-YYYY hoặc gõ tắt: 04, 1204)") (core/today) theme)]
+                  (let [v (tui-input (str resolved-label " (DD-MM-YYYY hoặc gõ tắt: 04, 1204, 23+10, 2304-1)") (core/today) theme)]
                     (cond
                       (str/blank? v) (do (core/clear-status!) (clear-screen) (render-header form @core/status-line theme) (core/today))
                       :else
@@ -237,6 +237,32 @@
                             expanded)))))))]
     (when (or (not required) (not (str/blank? (str value))))
       (swap! answers-atom assoc-in [:selectedByUser id-k] (core/parse-value value "date")))))
+
+(defmethod ask-field-by-type :datetime [{:keys [id label required]} form answers-atom theme]
+  (let [id-k (keyword id)
+        resolved-label (core/resolve-label label @answers-atom)
+        default-val (let [now (java.time.LocalDateTime/now)]
+                      (.format now (java.time.format.DateTimeFormatter/ofPattern "dd-MM-yyyy HH:mm")))
+        value (if (core/should-skip? id)
+                (core/get-prefilled id)
+                (loop []
+                  (let [v (tui-input (str resolved-label " (DD-MM-YYYY HH:MM hoặc gõ tắt: h0823, h0823-1, 23+10 h0823)") default-val theme)]
+                    (cond
+                      (str/blank? v) (do (core/clear-status!) (clear-screen) (render-header form @core/status-line theme) default-val)
+                      :else
+                      (if (not (core/valid-datetime-input? v :datetime))
+                        (do
+                          (core/set-status! "⚠️ Nhập sai định dạng. Ví dụ: 23-04-2026 08:34 hoặc h0823")
+                          (clear-screen)
+                          (render-header form @core/status-line theme)
+                          (recur))
+                        (do
+                          (core/clear-status!)
+                          (clear-screen)
+                          (render-header form @core/status-line theme)
+                          v))))))]
+    (when (or (not required) (not (str/blank? (str value))))
+      (swap! answers-atom assoc-in [:selectedByUser id-k] (core/parse-value value "datetime")))))
 
 (defmethod ask-field-by-type :select [{:keys [id label options]} form answers-atom theme]
   (let [id-k  (keyword id)
