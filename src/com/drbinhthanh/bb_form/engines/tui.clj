@@ -93,20 +93,51 @@
       (= c 32) :space
       :else c)))
 
-(defn render-options [options selected-index choices theme]
-  (let [cursor (get-in theme [:symbols :select-cursor] "➔ ")
-        empty-cursor (get-in theme [:symbols :select-empty] "  ")
-        checked (get-in theme [:symbols :multiselect-checked] "[x] ")
-        unchecked (get-in theme [:symbols :multiselect-unchecked] "[ ] ")]
-    (doseq [idx (range (count options))]
-      (let [opt (nth options idx)
-            is-current (= idx selected-index)
-            is-chosen (contains? choices opt)
-            prefix (if is-current cursor empty-cursor)
-            checkbox (if choices (if is-chosen checked unchecked) "")
-            style-fn (if is-current #(ansi-color theme :cyan %) identity)]
-        (println (style-fn (str prefix checkbox opt)))))
-    (flush)))
+(defn- get-all-fields [form]
+  (if-let [stages (:stages form)]
+    (mapcat :fields stages)
+    (:fields form)))
+
+(defn fuzzy-match? [query s]
+  (let [q (str/lower-case query)
+        s-low (str/lower-case s)]
+    (loop [q-chars (seq q)
+           s-chars (seq s-low)]
+      (cond
+        (empty? q-chars) true
+        (empty? s-chars) false
+        (= (first q-chars) (first s-chars)) (recur (next q-chars) (next s-chars))
+        :else (recur q-chars (next s-chars))))))
+
+(defn render-tui-state [form answers-atom theme status-msg]
+  (clear-screen)
+  (render-header form status-msg theme)
+  (let [fields (get-all-fields form)
+        answers @answers-atom
+        answered-fields (filter (fn [field]
+                                  (let [id (:id field)
+                                        type (keyword (:type field))
+                                        show? (or (nil? (:show-if field))
+                                                  (core/eval-expr (:show-if field) answers))]
+                                    (and show?
+                                         (not= type :hidden)
+                                         (core/should-skip? id))))
+                                fields)]
+    (when (seq answered-fields)
+      (println (ansi-color theme :bold (ansi-color theme :yellow "=== LỊCH SỬ TRẢ LỜI ===")))
+      (doseq [field answered-fields]
+        (let [id (:id field)
+              type (keyword (:type field))
+              label (core/resolve-label (:label field) answers)
+              val (get-in answers [:selectedByUser (keyword id)])]
+          (if (= type :info)
+            (println (ansi-color theme :reset (str "  ℹ️  " label)))
+            (println (ansi-color theme :green "  ✓ ")
+                     (ansi-color theme :bold label)
+                     (ansi-color theme :cyan " ➔ ")
+                     (ansi-color theme :reset (str val))))))
+      (println (ansi-color theme :bold (ansi-color theme :yellow "=======================")))
+      (println))))
 
 (defn tui-menu [label options multiselect? theme]
   (let [terminal (.. (TerminalBuilder/builder) (system true) (build))
@@ -118,39 +149,88 @@
       (let [reader (.reader terminal)]
         (println (ansi-color theme :bold (str prompt-prefix label)))
         (loop [selected-index 0
-               choices #{}]
-          (render-options options selected-index (when multiselect? choices) theme)
-          (let [k (read-key reader)]
-            (case k
-              :up (do
-                    (clear-menu-lines (count options))
-                    (recur (mod (dec selected-index) (count options)) choices))
-              :down (do
-                      (clear-menu-lines (count options))
-                      (recur (mod (inc selected-index) (count options)) choices))
-              :space (if multiselect?
-                       (let [opt (nth options selected-index)
-                             new-choices (if (contains? choices opt)
-                                           (disj choices opt)
-                                           (conj choices opt))]
-                         (clear-menu-lines (count options))
-                         (recur selected-index new-choices))
-                       (do
-                         (clear-menu-lines (count options))
-                         (recur selected-index choices)))
-              :enter (let [res (if multiselect?
-                                 (vec choices)
-                                 (nth options selected-index))]
-                       (clear-menu-lines (inc (count options)))
-                       (println (ansi-color theme :green (format completed-layout completed-prefix label (if multiselect? (str/join ", " res) res))))
-                       res)
-              (if (or (= k 3) (= k 113))
+               choices #{}
+               query ""
+               last-lines-printed 0]
+          (clear-menu-lines last-lines-printed)
+          (let [filtered-opts (filterv #(fuzzy-match? query %) options)
+                num-filtered (count filtered-opts)
+                adj-selected (if (zero? num-filtered) 
+                               0 
+                               (mod selected-index num-filtered))
+                window-size 5
+                start-idx (if (<= num-filtered window-size)
+                            0
+                            (max 0 (min (- num-filtered window-size)
+                                        (- adj-selected (quot window-size 2)))))
+                end-idx (min num-filtered (+ start-idx window-size))
+                start-idx (if (and (> start-idx 0) (< (- end-idx start-idx) window-size))
+                            (max 0 (- end-idx window-size))
+                            start-idx)
+                visible-opts (subvec filtered-opts start-idx end-idx)]
+            (println (ansi-color theme :bold (str "🔍 Tìm kiếm: " (ansi-color theme :cyan query) "█")))
+            (let [cursor (get-in theme [:symbols :select-cursor] "➔ ")
+                  empty-cursor (get-in theme [:symbols :select-empty] "  ")
+                  checked (get-in theme [:symbols :multiselect-checked] "[x] ")
+                  unchecked (get-in theme [:symbols :multiselect-unchecked] "[ ] ")]
+              (doseq [i (range (count visible-opts))]
+                (let [opt-idx (+ start-idx i)
+                      opt (nth visible-opts i)
+                      is-current (= opt-idx adj-selected)
+                      is-chosen (contains? choices opt)
+                      prefix (if is-current cursor empty-cursor)
+                      checkbox (if multiselect? (if is-chosen checked unchecked) "")
+                      style-fn (if is-current #(ansi-color theme :cyan %) identity)]
+                  (println (style-fn (str prefix checkbox opt))))))
+            (let [help-txt (if multiselect?
+                             " [↑/↓: Di chuyển | Space: Chọn/Bỏ chọn | Enter: Xác nhận | Gõ để lọc | Backspace: Xóa]"
+                             " [↑/↓: Di chuyển | Enter: Chọn | Gõ để lọc | Backspace: Xóa]")]
+              (println (ansi-color theme :yellow (str "   (Kết quả: " num-filtered "/" (count options) ")" help-txt))))
+            (flush)
+            (let [current-lines (+ 2 (count visible-opts))
+                  k (read-key reader)]
+              (cond
+                (= k :up)
+                (recur (if (zero? num-filtered) 0 (mod (dec adj-selected) num-filtered)) choices query current-lines)
+                
+                (= k :down)
+                (recur (if (zero? num-filtered) 0 (mod (inc adj-selected) num-filtered)) choices query current-lines)
+                
+                (= k :space)
+                (if multiselect?
+                  (if (seq filtered-opts)
+                    (let [opt (nth filtered-opts adj-selected)
+                          new-choices (if (contains? choices opt)
+                                        (disj choices opt)
+                                        (conj choices opt))]
+                      (recur adj-selected new-choices query current-lines))
+                    (recur adj-selected choices query current-lines))
+                  (let [new-query (str query " ")]
+                    (recur 0 choices new-query current-lines)))
+                
+                (= k :enter)
+                (let [res (if multiselect?
+                            (vec choices)
+                            (if (seq filtered-opts) (nth filtered-opts adj-selected) nil))]
+                  (clear-menu-lines current-lines)
+                  res)
+                
+                (or (= k 127) (= k 8))
+                (let [new-query (if (empty? query) "" (subs query 0 (dec (count query))))]
+                  (recur 0 choices new-query current-lines))
+                
+                (or (= k 3) (and (= k (int \q)) (empty? query)))
                 (do
                   (.close terminal)
                   (System/exit 0))
-                (do
-                  (clear-menu-lines (count options))
-                  (recur selected-index choices)))))))
+                
+                (and (integer? k) (>= k 32))
+                (let [ch (char k)
+                      new-query (str query ch)]
+                  (recur 0 choices new-query current-lines))
+                
+                :else
+                (recur adj-selected choices query current-lines))))))
       (finally
         (.close terminal)))))
 
@@ -165,7 +245,8 @@
     (if (core/should-skip? id)
       (swap! answers-atom assoc-in [:selectedByUser id-k] resolved-label)
       (do
-        (println "\n" resolved-label)
+        (render-tui-state form answers-atom theme @core/status-line)
+        (println resolved-label)
         (pause "Nhấn Enter để tiếp tục..." theme)
         (swap! answers-atom assoc-in [:selectedByUser id-k] resolved-label)))))
 
@@ -175,19 +256,18 @@
         resolved-label (core/resolve-label label @answers-atom)
         value   (if (core/should-skip? id)
                   (core/get-prefilled id)
-                  (loop []
-                    (let [v (tui-input resolved-label nil theme)]
-                      (if (and pattern (not (re-matches pattern v)))
-                        (do
-                          (core/set-status! (or regexError (str "Giá trị không khớp với regex: " regex)))
-                          (clear-screen)
-                          (render-header form @core/status-line theme)
-                          (recur))
-                        (do
-                          (core/clear-status!)
-                          (clear-screen)
-                          (render-header form @core/status-line theme)
-                          v)))))]
+                  (do
+                    (render-tui-state form answers-atom theme @core/status-line)
+                    (loop []
+                      (let [v (tui-input resolved-label nil theme)]
+                        (if (and pattern (not (re-matches pattern v)))
+                          (do
+                            (core/set-status! (or regexError (str "Giá trị không khớp với regex: " regex)))
+                            (render-tui-state form answers-atom theme @core/status-line)
+                            (recur))
+                          (do
+                            (core/clear-status!)
+                            v))))))]
     (when (or (not required) (not (str/blank? (str value))))
       (swap! answers-atom assoc-in [:selectedByUser id-k] (core/parse-value value "text")))))
 
@@ -195,21 +275,20 @@
   (let [id-k (keyword id)
         resolved-label (core/resolve-label label @answers-atom)
         value (if (core/should-skip? id)
-                (core/get-prefilled id)
-                (loop []
-                  (let [v (tui-input resolved-label nil theme)]
-                    (if (or (not required)
-                            (try (Integer/parseInt v) true (catch Exception _ false)))
-                      (do
-                        (core/clear-status!)
-                        (clear-screen)
-                        (render-header form @core/status-line theme)
-                        v)
-                      (do
-                        (core/set-status! "⚠️ Vui lòng nhập số nguyên!")
-                        (clear-screen)
-                        (render-header form @core/status-line theme)
-                        (recur))))))]
+                  (core/get-prefilled id)
+                  (do
+                    (render-tui-state form answers-atom theme @core/status-line)
+                    (loop []
+                      (let [v (tui-input resolved-label nil theme)]
+                        (if (or (not required)
+                                (try (Integer/parseInt v) true (catch Exception _ false)))
+                          (do
+                            (core/clear-status!)
+                            v)
+                          (do
+                            (core/set-status! "⚠️ Vui lòng nhập số nguyên!")
+                            (render-tui-state form answers-atom theme @core/status-line)
+                            (recur)))))))]
     (when (or (not required) (not (str/blank? (str value))))
       (swap! answers-atom assoc-in [:selectedByUser id-k] (core/parse-value value "number")))))
 
@@ -217,24 +296,23 @@
   (let [id-k (keyword id)
         resolved-label (core/resolve-label label @answers-atom)
         value (if (core/should-skip? id)
-                (core/get-prefilled id)
-                (loop []
-                  (let [v (tui-input (str resolved-label " (DD-MM-YYYY hoặc gõ tắt: 04, 1204, 23+10, 2304-1)") (core/today) theme)]
-                    (cond
-                      (str/blank? v) (do (core/clear-status!) (clear-screen) (render-header form @core/status-line theme) (core/today))
-                      :else
-                      (let [expanded (core/expand-date-shortcut v)]
-                        (if (not (core/valid-date? expanded))
-                          (do
-                            (core/set-status! "⚠️ Ngày tháng không hợp lệ. Ví dụ: 31-12-2023")
-                            (clear-screen)
-                            (render-header form @core/status-line theme)
-                            (recur))
-                          (do
-                            (core/clear-status!)
-                            (clear-screen)
-                            (render-header form @core/status-line theme)
-                            expanded)))))))]
+                  (core/get-prefilled id)
+                  (do
+                    (render-tui-state form answers-atom theme @core/status-line)
+                    (loop []
+                      (let [v (tui-input (str resolved-label " (DD-MM-YYYY hoặc gõ tắt: 04, 1204, 23+10, 2304-1)") (core/today) theme)]
+                        (cond
+                          (str/blank? v) (do (core/clear-status!) (core/today))
+                          :else
+                          (let [expanded (core/expand-date-shortcut v)]
+                            (if (not (core/valid-date? expanded))
+                              (do
+                                (core/set-status! "⚠️ Ngày tháng không hợp lệ. Ví dụ: 31-12-2023")
+                                (render-tui-state form answers-atom theme @core/status-line)
+                                (recur))
+                              (do
+                                (core/clear-status!)
+                                expanded))))))))]
     (when (or (not required) (not (str/blank? (str value))))
       (swap! answers-atom assoc-in [:selectedByUser id-k] (core/parse-value value "date")))))
 
@@ -244,23 +322,22 @@
         default-val (let [now (java.time.LocalDateTime/now)]
                       (.format now (java.time.format.DateTimeFormatter/ofPattern "dd-MM-yyyy HH:mm")))
         value (if (core/should-skip? id)
-                (core/get-prefilled id)
-                (loop []
-                  (let [v (tui-input (str resolved-label " (DD-MM-YYYY HH:MM hoặc gõ tắt: h0823, h0823-1, 23+10 h0823)") default-val theme)]
-                    (cond
-                      (str/blank? v) (do (core/clear-status!) (clear-screen) (render-header form @core/status-line theme) default-val)
-                      :else
-                      (if (not (core/valid-datetime-input? v :datetime))
-                        (do
-                          (core/set-status! "⚠️ Nhập sai định dạng. Ví dụ: 23-04-2026 08:34 hoặc h0823")
-                          (clear-screen)
-                          (render-header form @core/status-line theme)
-                          (recur))
-                        (do
-                          (core/clear-status!)
-                          (clear-screen)
-                          (render-header form @core/status-line theme)
-                          v))))))]
+                  (core/get-prefilled id)
+                  (do
+                    (render-tui-state form answers-atom theme @core/status-line)
+                    (loop []
+                      (let [v (tui-input (str resolved-label " (DD-MM-YYYY HH:MM hoặc gõ tắt: h0823, h0823-1, 23+10 h0823)") default-val theme)]
+                        (cond
+                          (str/blank? v) (do (core/clear-status!) default-val)
+                          :else
+                          (if (not (core/valid-datetime-input? v :datetime))
+                            (do
+                              (core/set-status! "⚠️ Nhập sai định dạng. Ví dụ: 23-04-2026 08:34 hoặc h0823")
+                              (render-tui-state form answers-atom theme @core/status-line)
+                              (recur))
+                            (do
+                              (core/clear-status!)
+                              v)))))))]
     (when (or (not required) (not (str/blank? (str value))))
       (swap! answers-atom assoc-in [:selectedByUser id-k] (core/parse-value value "datetime")))))
 
@@ -269,8 +346,10 @@
         resolved-label (core/resolve-label label @answers-atom)
         opts  (mapv core/normalize-str options)
         value (if (core/should-skip? id)
-                (core/get-prefilled id)
-                (tui-menu resolved-label opts false theme))]
+                  (core/get-prefilled id)
+                  (do
+                    (render-tui-state form answers-atom theme @core/status-line)
+                    (tui-menu resolved-label opts false theme)))]
     (swap! answers-atom assoc-in [:selectedByUser id-k] value)))
 
 (defmethod ask-field-by-type :radio [field form answers-atom theme]
@@ -282,7 +361,9 @@
         opts    (mapv core/normalize-str options)
         raw     (if (core/should-skip? id)
                   (core/get-prefilled id)
-                  (tui-menu resolved-label opts true theme))
+                  (do
+                    (render-tui-state form answers-atom theme @core/status-line)
+                    (tui-menu resolved-label opts true theme)))
         choices (cond
                   (string? raw) [raw]
                   (sequential? raw) raw

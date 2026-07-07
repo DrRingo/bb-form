@@ -1,8 +1,12 @@
 {:selectedByUser
- {:ngoi_thai "Ngang",
-  :nuoc_oi "Đã vỡ",
-  :gio_vo_oi "2026-07-05 18:23",
-  :so_gio_vo_oi "⏱️  Số giờ vỡ ối đến hiện tại: 14 giờ",
-  :khung_chau "Bình thường",
-  :can_nang_thai 2334},
+ {:ky_nang ["Phân tích dữ liệu"],
+  :phong_ban "Nhân sự",
+  :trinh_do_hoc_van "Đại học",
+  :ngay_vao_lam "2026-07-07 00:00",
+  :ma_nhan_vien "NV143",
+  :chuyen_mon_hr [],
+  :email_cong_ty "jfl@fjls.jflsj",
+  :ho_ten "rin",
+  :muc_do_hai_long "Hài lòng",
+  :ghi_chu ""},
  :HiddenVar {}}
