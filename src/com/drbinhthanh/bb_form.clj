@@ -91,6 +91,11 @@
           (recur rest
                  (assoc opts :serve true))
 
+          ;; Parse option --marathon (chạy không nghỉ, tự điền giá trị mặc định)
+          (= k "--marathon")
+          (recur rest
+                 (assoc opts :marathon true))
+
           ;; Parse option --theme <path.edn>
           (= k "--theme")
           (if (empty? rest)
@@ -112,7 +117,7 @@
                                          (not (str/includes? % ":"))
                                          (or (str/ends-with? % ".edn")
                                              (str/ends-with? % ".json"))) args))
-        {:keys [values-file kv-args output-file format engine theme serve]} (parse-options args)
+        {:keys [values-file kv-args output-file format engine theme serve marathon]} (parse-options args)
         kv-values   (parse-kv-args kv-args)
         edn-values  (if values-file
                       (edn/read-string (slurp values-file))
@@ -126,6 +131,7 @@
       (do (println "❌ Vui lòng nhập đường dẫn tới file form")
           (println (str "Cách sử dụng: bb-form <form.edn|form.json>"
                         " [--values <values.edn>]"
+                        " [--marathon]"
                         " [--out <output.edn|output.json>]"
                         " [--format json|edn]"
                         " [--engine gum|tui|winform|formsmd]"
@@ -145,8 +151,8 @@
 
         ;; Delegate form execution to the chosen engine
         (case chosen-engine
-          :gum (gum/run form core/answers {:theme theme})
-          :tui (tui/run form core/answers {:theme theme})
+          :gum (gum/run form core/answers {:theme theme :marathon marathon})
+          :tui (tui/run form core/answers {:theme theme :marathon marathon})
           :winform (winform/run form core/answers {:theme theme})
           :formsmd (formsmd/run form core/answers {:theme theme :form-file form-file :output-file output-path :serve serve})
           (do

@@ -292,15 +292,17 @@
 (defn ask-field [field form answers-atom theme]
   (ask-field-by-type field form answers-atom theme))
 
-(defn tui-adapter [theme]
+(defn tui-adapter [theme marathon?]
   {:clear-screen clear-screen
    :render-header #(render-header %1 %2 theme)
    :show-error #(show-error % theme)
    :ask-field #(ask-field %1 %2 %3 theme)
-   :pause #(pause % theme)})
+   :pause #(pause % theme)
+   :marathon? marathon?})
 
 (defn run [form answers-atom options]
   (let [default-theme-var (requiring-resolve 'com.drbinhthanh.bb-form.themes.tui-theme/default-theme)
         default-theme @default-theme-var
-        theme (core/load-theme default-theme (:theme options))]
-    (core/run-terminal-form form answers-atom (tui-adapter theme))))
+        theme (core/load-theme default-theme (:theme options))
+        marathon? (boolean (:marathon options))]
+    (core/run-terminal-form form answers-atom (tui-adapter theme marathon?))))

@@ -1,0 +1,11 @@
+.clj-kondo
+.cpcache
+.bb_cache
+.git
+.vscode
+.shadow-cljs
+.idea
+.DS_Store
+.lsp
+.nrepl-history
+.vorg.db

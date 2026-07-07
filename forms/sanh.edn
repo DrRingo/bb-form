@@ -13,6 +13,7 @@
    :label    "Ngôi thai"
    :type     :select
    :options  ["Đầu" "Mông" "Ngang" "Chưa xác định"]
+   :default  "Đầu"
    :required true}
 
   ;; ─────────────────────────────────────────────────────────────────
@@ -24,6 +25,7 @@
    :type     :select
    :options  ["Đóng" "Mở 2cm" "Mở 3cm" "Mở 4cm" "Mở 5cm"
               "Mở 6cm" "Mở 7cm" "Mở 8cm" "Gần trọn" "Trọn"]
+   :default  "Đóng"
    :required true
    :show-if  [:or [:= [:var :ngoi_thai] "Đầu"]
                   [:= [:var :ngoi_thai] "Mông"]]}
@@ -36,6 +38,7 @@
    :label    "Độ xóa CTC"
    :type     :select
    :options  ["50%" "60%" "80%"]
+   :default  "60%"
    :required true
    :show-if  [:and
               [:or [:= [:var :ngoi_thai] "Đầu"]
@@ -56,6 +59,7 @@
    :options  ["Chẩm trái trước" "Chẩm trái sau"
               "Chẩm phải trước" "Chẩm phải sau"
               "Chẩm cùng" "Kiểu thế ngang"]
+   :default  "Chẩm trái trước"
    :required true
    :show-if  [:and
               [:= [:var :ngoi_thai] "Đầu"]
@@ -73,6 +77,7 @@
    :label    "Kiểu thế (Ngôi Mông)"
    :type     :select
    :options  ["Mông thiếu kiểu mông" "Mông thiếu kiểu chân" "Mông đủ"]
+   :default  "Mông đủ"
    :required true
    :show-if  [:and
               [:= [:var :ngoi_thai] "Mông"]
@@ -89,6 +94,7 @@
   {:id         :do_lot
    :label      "Độ lọt (nhập số từ -2 đến +3)"
    :type       :number
+   :default    -2
    :required   true
    :regexError "Chỉ nhập số nguyên từ -2 đến +3"
    :show-if    [:and
@@ -104,7 +110,8 @@
   {:id       :buou_huyet_thanh
    :label    "Tình trạng bướu huyết thanh"
    :type     :select
-   :options  ["Nhỏ" "Trung bình" "Lớn"]
+   :options  ["Không có" "Nhỏ" "Trung bình" "Lớn"]
+   :default  "Không có"
    :required true
    :show-if  [:and
               [:or [:= [:var :ngoi_thai] "Đầu"]
@@ -119,6 +126,7 @@
    :label    "Tình trạng nước ối"
    :type     :select
    :options  ["Còn" "Đã vỡ"]
+   :default  "Còn"
    :required true}
 
   ;; ─────────────────────────────────────────────────────────────────
@@ -147,6 +155,7 @@
    :label    "Tình trạng khung chậu"
    :type     :select
    :options  ["Hẹp" "Giới hạn" "Bình thường"]
+   :default  "Bình thường"
    :required true}
 
   ;; ─────────────────────────────────────────────────────────────────
@@ -155,6 +164,7 @@
   {:id         :can_nang_thai
    :label      "Ước lượng cân nặng thai nhi (gram, từ 500 đến 6000)"
    :type       :number
+   :default    3000
    :required   true
    :regexError "Nhập số gram hợp lý từ 500 đến 6000"}
  ]}

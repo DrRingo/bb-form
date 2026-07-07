@@ -270,6 +270,34 @@
     ("date" :date)         (normalize-datetime v :date)
     ("datetime" :datetime) (normalize-datetime v :datetime)
     v))
+
+;; Returns the auto-fill value for a field in marathon mode
+(defn get-marathon-default [field]
+  (let [type             (keyword (:type field))
+        explicit-default (:default field)]
+    (cond
+      ;; info/hidden: bỏ qua - xử lý riêng trong run-terminal-form
+      (#{:info :hidden} type) nil
+
+      ;; nếu có :default tường minh ⇒ parse và trả về
+      (some? explicit-default) (parse-value explicit-default (name type))
+
+      ;; select / radio: lấy option đầu tiên
+      (#{:select :radio} type)
+      (first (mapv normalize-str (:options field)))
+
+      ;; multiselect: vector chứa option đầu tiên
+      (= type :multiselect)
+      (when-let [first-opt (first (mapv normalize-str (:options field)))]
+        [first-opt])
+
+      (= type :text)     ""
+      (= type :number)   0
+      (= type :date)     (today)
+      (= type :datetime) (let [now (java.time.LocalDateTime/now)]
+                           (.format now (java.time.format.DateTimeFormatter/ofPattern "dd-MM-yyyy HH:mm")))
+
+      :else nil)))
 (defn ->pattern [regex]
   (cond
     (instance? java.util.regex.Pattern regex) regex
@@ -390,12 +418,25 @@
                                   count))
                               (let [answered? (should-skip? id)]
                                 (if-not answered?
-                                  (do
-                                    ((:ask-field ui-adapter) field form answers-atom)
-                                    (when (:actions field)
-                                      (eval-actions (:actions field) answers-atom ui-adapter))
-                                    (swap! executed-actions conj id)
-                                    (inc count))
+                                  (if (:marathon? ui-adapter)
+                                    ;; Marathon mode: tự điền giá trị mặc định, không tương tác
+                                    (let [id-k     (keyword id)
+                                          auto-val (if (= type :info)
+                                                     (resolve-label (:label field) @answers-atom)
+                                                     (get-marathon-default field))]
+                                      (when (some? auto-val)
+                                        (swap! answers-atom assoc-in [:selectedByUser id-k] auto-val))
+                                      (when (:actions field)
+                                        (eval-actions (:actions field) answers-atom ui-adapter))
+                                      (swap! executed-actions conj id)
+                                      (inc count))
+                                    ;; Normal mode: hỏi người dùng
+                                    (do
+                                      ((:ask-field ui-adapter) field form answers-atom)
+                                      (when (:actions field)
+                                        (eval-actions (:actions field) answers-atom ui-adapter))
+                                      (swap! executed-actions conj id)
+                                      (inc count)))
                                   (do
                                     (let [id-k (keyword id)
                                           val (get-in @answers-atom [:selectedByUser id-k])]

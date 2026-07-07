@@ -1,0 +1,6 @@
+{;; Giá trị muốn chỉ định cụ thể — phần còn lại marathon tự điền default
+ :ngoi_thai    "Đầu"
+ :do_mo_ctc    "Đóng"
+ :nuoc_oi      "Còn"
+ :khung_chau   "Bình thường"
+ :can_nang_thai 3000}
