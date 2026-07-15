@@ -1,0 +1,224 @@
+;; ═══════════════════════════════════════════════════════════════
+;; STRESS TEST 3: Murder Mystery — Deep Backward Chain
+;; Mục tiêu kiểm tra:
+;;   ✅ Chuỗi phụ thuộc 4 tầng qua nhiều biến ẩn trung gian
+;;   ✅ Pruning cực mạnh: hỏi ít nhất theo nhánh lựa chọn
+;;   ✅ :or với nhiều luật cùng goal → chỉ hỏi nhánh cần thiết
+;;   ✅ Rule dùng :not [:exists] + nhiều phép logic lồng nhau
+;;   ✅ Biến ẩn từ biến ẩn khác (nguy_co_chinh → nghi_pham_chinh → ket_luan)
+;;   ✅ Scores được cộng dồn qua nhiều rule nhỏ
+;; ═══════════════════════════════════════════════════════════════
+
+{:format      :expert
+ :title       "Vụ Mưu Sát Tại Dinh Thự Đêm Sương"
+ :description "Thám tử cao cấp. Phân tích bằng chứng pháp y để xác định thủ phạm và động cơ."
+
+ :goals [:ban_an_cuoi_cung]
+
+ :fields
+ [;; === DANH TÍNH ===
+  {:id       :ten_tham_tu
+   :label    "Danh hiệu thám tử của bạn?"
+   :type     :text
+   :required true
+   :priority 100}
+
+  ;; === PHÁP Y ===
+  {:id       :thoi_gian_chet
+   :label    "Thời gian tử vong ước tính (theo kết quả nhiệt độ thi thể)"
+   :type     :select
+   :required true
+   :options  ["Trước 21:00" "21:00 - 23:00" "23:00 - 01:00" "Sau 01:00"]
+   :priority 95}
+
+  {:id       :nguyen_nhan_chet
+   :label    "Nguyên nhân tử vong theo pháp y"
+   :type     :select
+   :required true
+   :options  ["Ngộ độc thạch tín" "Vết dao đâm" "Bóp cổ" "Ngã từ trên cao"
+              "Chưa xác định"]
+   :priority 90}
+
+  {:id       :loai_doc_chat
+   :label    "Loại độc chất (nếu có) theo xét nghiệm máu"
+   :type     :select
+   :required true
+   :options  ["Thạch tín vô cơ" "Cyanide" "Thuốc ngủ quá liều" "Không phát hiện"]
+   :priority 85}
+
+  ;; === HIỆN TRƯỜNG ===
+  {:id       :vi_tri_thi_the
+   :label    "Vị trí phát hiện thi thể"
+   :type     :select
+   :required true
+   :options  ["Phòng thư viện" "Bếp" "Hầm rượu" "Phòng ngủ chính" "Vườn phía sau"]
+   :priority 80}
+
+  {:id       :dau_vet_dau_tranh
+   :label    "Có dấu vết đấu tranh tại hiện trường không?"
+   :type     :select
+   :required true
+   :options  ["Có - mạnh" "Có - nhẹ" "Không"]
+   :priority 75}
+
+  {:id       :dau_vet_xam_nhap
+   :label    "Dấu vết xâm nhập từ bên ngoài"
+   :type     :select
+   :required true
+   :options  ["Cửa bị phá" "Cửa sổ vỡ" "Không có"]
+   :priority 72}
+
+  ;; === NHÂN CHỨNG & ALIBIS ===
+  {:id       :nguoi_cuoi_gap
+   :label    "Ai là người cuối cùng nhìn thấy nạn nhân còn sống?"
+   :type     :select
+   :required true
+   :options  ["Gia nhân Maria" "Con trai Thomas" "Vợ Rebecca" "Đối tác kinh doanh Victor"
+              "Không ai nhìn thấy"]
+   :priority 70}
+
+  {:id       :alibi_thomas
+   :label    "Alibi của Thomas (con trai): Anh ta ở đâu lúc 22:00?"
+   :type     :select
+   :required false
+   :options  ["Tại câu lạc bộ đêm (có nhân chứng)" "Ở nhà một mình" "Đang đi du lịch"
+              "Không rõ"]
+   :priority 65}
+
+  {:id       :alibi_rebecca
+   :label    "Alibi của Rebecca (vợ): Bà ta ở đâu lúc 22:00?"
+   :type     :select
+   :required false
+   :options  ["Tại bệnh viện thăm bạn (có hồ sơ)" "Ở phòng riêng" "Đi mua sắm muộn"
+              "Không rõ"]
+   :priority 62}
+
+  {:id       :alibi_victor
+   :label    "Alibi của Victor (đối tác): Ông ta ở đâu lúc 22:00?"
+   :type     :select
+   :required false
+   :options  ["Tại hội nghị quốc tế (đã xác minh)" "Trong văn phòng riêng" "Không rõ"]
+   :priority 60}
+
+  ;; === TÀI CHÍNH ===
+  {:id       :di_chuc
+   :label    "Nội dung di chúc của nạn nhân"
+   :type     :select
+   :required true
+   :options  ["Thomas thừa hưởng tất cả" "Rebecca thừa hưởng tất cả"
+              "Chia đều cho Thomas và Rebecca" "Victor là người thụ hưởng chính"
+              "Tổ chức từ thiện"]
+   :priority 55}
+
+  {:id       :tranh_chap_tai_chinh
+   :label    "Có tranh chấp tài chính với nạn nhân không (6 tháng gần đây)?"
+   :type     :select
+   :required true
+   :options  ["Thomas tranh chấp thừa kế" "Rebecca tranh chấp tài sản hôn nhân"
+              "Victor tranh chấp hợp đồng" "Không có"]
+   :priority 50}
+
+  ;; === KẾT LUẬN ===
+  {:id       :man_hinh_ket_luan
+   :label    "\n╔═══ PHÁN QUYẾT CỦA THÁM TỬ ════════════╗\n\nThám tử: {{ten_tham_tu}}\n\nPhân tích:\n• Nguyên nhân: {{nguyen_nhan_chet}}\n• Nghi phạm chính: {{nghi_pham_chinh}}\n• Động cơ: {{dong_co_chinh}}\n\nKẾT LUẬN: {{ban_an_cuoi_cung}}\n\n╚════════════════════════════════════════╝"
+   :type     :info
+   :required true
+   :default  [:if [:exists :ban_an_cuoi_cung] "done" :not-answered]
+   :priority 5}
+ ]
+
+ :rules
+ [
+  ;; ═══ TẦNG 1: XÁC ĐỊNH PHƯƠNG PHÁP GÂY ÁN (Intermediate) ═══
+
+  ;; Ngộ độc nội bộ (thủ phạm trong nhà, biết vị trí bếp/kho)
+  {:id :rule-ngo-doc-noi-bo
+   :priority 10
+   :if [:and [:contains? ["Ngộ độc thạch tín"] :nguyen_nhan_chet]
+             [:= :dau_vet_xam_nhap "Không có"]
+             [:= :dau_vet_dau_tranh "Không"]]
+   :then {:kieu_gay_an "Đầu độc nội bộ - thủ phạm là người thân cận"}}
+
+  ;; Bạo lực bên ngoài
+  {:id :rule-bao-luc-ngoai
+   :priority 10
+   :if [:or [:contains? ["Cửa bị phá" "Cửa sổ vỡ"] :dau_vet_xam_nhap]
+            [:= :dau_vet_dau_tranh "Có - mạnh"]]
+   :then {:kieu_gay_an "Tấn công bạo lực từ bên ngoài"}}
+
+  ;; Sắp xếp hiện trường giả tạo
+  {:id :rule-hien-truong-gia-tao
+   :priority 10
+   :if [:and [:contains? ["Vết dao đâm" "Bóp cổ"] :nguyen_nhan_chet]
+             [:= :dau_vet_xam_nhap "Không có"]
+             [:= :dau_vet_dau_tranh "Không"]]
+   :then {:kieu_gay_an "Giết người có tính toán - hiện trường bị sắp xếp"}}
+
+  ;; ═══ TẦNG 2a: ĐỘNG CƠ (Intermediate) ═══
+
+  {:id :rule-dong-co-tai-san
+   :priority 10
+   :if [:or [:contains? ["Thomas thừa hưởng tất cả" "Rebecca thừa hưởng tất cả"] :di_chuc]
+            [:contains? ["Thomas tranh chấp thừa kế" "Rebecca tranh chấp tài sản hôn nhân"] :tranh_chap_tai_chinh]]
+   :then {:dong_co_chinh "Động cơ tài chính (thừa kế/tài sản)"}}
+
+  {:id :rule-dong-co-kinh-doanh
+   :priority 10
+   :if [:and [:= :tranh_chap_tai_chinh "Victor tranh chấp hợp đồng"]
+             [:= :di_chuc "Victor là người thụ hưởng chính"]]
+   :then {:dong_co_chinh "Động cơ kinh doanh (hợp đồng + thừa kế)"}}
+
+  {:id :rule-dong-co-tinh-cam
+   :priority 10
+   :if [:and [:= :nguoi_cuoi_gap "Vợ Rebecca"]
+             [:= :alibi_rebecca "Không rõ"]
+             [:= :thoi_gian_chet "21:00 - 23:00"]]
+   :then {:dong_co_chinh "Động cơ cá nhân (mâu thuẫn hôn nhân)"}}
+
+  ;; ═══ TẦNG 2b: NGHI PHẠM CHÍNH (Intermediate) ═══
+
+  {:id :rule-nghi-pham-thomas
+   :priority 10
+   :if [:and [:= :kieu_gay_an "Đầu độc nội bộ - thủ phạm là người thân cận"]
+             [:contains? ["Thomas thừa hưởng tất cả" "Thomas tranh chấp thừa kế"] :di_chuc]
+             [:or [:= :alibi_thomas "Ở nhà một mình"]
+                  [:= :alibi_thomas "Không rõ"]]]
+   :then {:nghi_pham_chinh "Thomas (con trai)"}}
+
+  {:id :rule-nghi-pham-rebecca
+   :priority 10
+   :if [:and [:contains? ["Đầu độc nội bộ - thủ phạm là người thân cận"
+                          "Giết người có tính toán - hiện trường bị sắp xếp"] :kieu_gay_an]
+             [:= :tranh_chap_tai_chinh "Rebecca tranh chấp tài sản hôn nhân"]
+             [:or [:= :alibi_rebecca "Ở phòng riêng"]
+                  [:= :alibi_rebecca "Không rõ"]]]
+   :then {:nghi_pham_chinh "Rebecca (vợ)"}}
+
+  {:id :rule-nghi-pham-victor
+   :priority 10
+   :if [:and [:= :kieu_gay_an "Tấn công bạo lực từ bên ngoài"]
+             [:= :tranh_chap_tai_chinh "Victor tranh chấp hợp đồng"]
+             [:= :alibi_victor "Không rõ"]]
+   :then {:nghi_pham_chinh "Victor (đối tác kinh doanh)"}}
+
+  {:id :rule-nghi-pham-khong-ro
+   :priority 5   ;; THẤP NHẤT - chỉ kích hoạt khi không rule nào khác thỏa
+   :require [:kieu_gay_an :dong_co_chinh]
+   :then {:nghi_pham_chinh "Chưa xác định - cần điều tra thêm"}}
+
+  ;; ═══ TẦNG 3: BAN ÁN CUỐI CÙNG (GOAL) ═══
+  ;; Rule cuối cùng tổng hợp tất cả biến ẩn → ban án text đầy đủ
+  ;; priority 30 đảm bảo nó fire sau rule-nghi-pham-khong-ro (priority 5)
+  {:id :rule-ban-an-final
+   :priority 30
+   :require [:nghi_pham_chinh :dong_co_chinh :kieu_gay_an]
+   :then {:ban_an_cuoi_cung
+          [:if [:= :nghi_pham_chinh "Thomas (con trai)"]
+           "Bắt giữ Thomas. Bằng chứng: bình thạch tín trong phòng, không có alibi, hưởng thừa kế 100%."
+           [:if [:= :nghi_pham_chinh "Rebecca (vợ)"]
+            "Bắt giữ Rebecca. Bằng chứng: mâu thuẫn hôn nhân, dấu vết tại bếp, alibi không rõ ràng."
+            [:if [:= :nghi_pham_chinh "Victor (đối tác kinh doanh)"]
+             "Bắt giữ Victor. Bằng chứng: phá cửa xâm nhập, tranh chấp hợp đồng 2 triệu USD."
+             "Chưa đủ bằng chứng kết tội. Tiếp tục điều tra các nghi phạm còn lại."]]]}}
+ ]
+}

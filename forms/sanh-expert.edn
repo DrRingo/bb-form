@@ -1,0 +1,282 @@
+{:format      :expert
+ :title       "Đánh Giá Tình Trạng Chuyển Dạ (Chế Độ Hệ Chuyên Gia)"
+ :description "Biểu mẫu thu thập thông tin lâm sàng chuyển dạ sử dụng hệ luật suy diễn để tối giản câu hỏi."
+
+ ;; Nhập các hàm tiện ích lâm sàng từ file Clojure bên ngoài
+ :import [["../formulas/sanh_utils.clj" :as :sanh]]
+
+ ;; Mục tiêu cuối cùng của toàn bộ biểu mẫu để Expert System tập trung giải quyết
+ :goals [:ket_luan]
+
+ :fields
+ [
+  ;; ─────────────────────────────────────────────────────────────────
+  ;; 1. NGÔI THAI
+  ;; Luôn được hỏi đầu tiên vì có độ ưu tiên cao nhất (:priority 100)
+  ;; ─────────────────────────────────────────────────────────────────
+  {:id       :ngoi_thai
+   :label    "Ngôi thai"
+   :type     :select
+   :options  ["Đầu" "Mông" "Ngang" "Chưa xác định"]
+   :default  "Đầu"
+   :required true
+   :priority 100}
+
+  ;; ─────────────────────────────────────────────────────────────────
+  ;; 2. ĐỘ MỞ CỔ TỬ CUNG (CTC)
+  ;; Độ ưu tiên 90. Sẽ tự động xuất hiện nếu ngôi thai là Đầu hoặc Mông
+  ;; ─────────────────────────────────────────────────────────────────
+  {:id       :do_mo_ctc
+   :label    "Độ mở CTC"
+   :type     :select
+   :options  ["Đóng" "Mở 2cm" "Mở 3cm" "Mở 4cm" "Mở 5cm"
+              "Mở 6cm" "Mở 7cm" "Mở 8cm" "Gần trọn" "Trọn"]
+   :default  "Đóng"
+   :required true
+   :priority 90}
+
+  ;; ─────────────────────────────────────────────────────────────────
+  ;; 3. ĐỘ XÓA CỔ TỬ CUNG
+  ;; Độ ưu tiên 85. Chỉ xuất hiện khi CTC đang mở ở mức từ 2cm đến 6cm
+  ;; ─────────────────────────────────────────────────────────────────
+  {:id       :do_xoa_ctc
+   :label    "Độ xóa CTC"
+   :type     :select
+   :options  ["50%" "60%" "80%"]
+   :default  "60%"
+   :required true
+   :priority 85}
+
+  ;; ─────────────────────────────────────────────────────────────────
+  ;; 4a. KIỂU THẾ — NGÔI ĐẦU
+  ;; Chỉ xuất hiện nếu ngôi thai là Đầu VÀ cổ tử cung mở từ 6cm trở lên
+  ;; ─────────────────────────────────────────────────────────────────
+  {:id       :kieu_the_dau
+   :label    "Kiểu thế (Ngôi Đầu)"
+   :type     :select
+   :options  ["Chẩm trái trước" "Chẩm trái sau"
+              "Chẩm phải trước" "Chẩm phải sau"
+              "Chẩm cùng" "Kiểu thế ngang"]
+   :default  "Chẩm trái trước"
+   :required true
+   :priority 80}
+
+  ;; ─────────────────────────────────────────────────────────────────
+  ;; 4b. KIỂU THẾ — NGÔI MÔNG
+  ;; Chỉ xuất hiện nếu ngôi thai là Mông VÀ cổ tử cung mở từ 6cm trở lên
+  ;; ─────────────────────────────────────────────────────────────────
+  {:id       :kieu_the_mong
+   :label    "Kiểu thế (Ngôi Mông)"
+   :type     :select
+   :options  ["Mông thiếu kiểu mông" "Mông thiếu kiểu chân" "Mông đủ"]
+   :default  "Mông đủ"
+   :required true
+   :priority 80}
+
+  ;; ─────────────────────────────────────────────────────────────────
+  ;; 5. ĐỘ LỌT
+  ;; Chỉ xuất hiện khi ngôi thai thuận lợi và CTC mở gần trọn hoặc trọn
+  ;; ─────────────────────────────────────────────────────────────────
+  {:id         :do_lot
+   :label      "Độ lọt (nhập số từ -2 đến +3)"
+   :type       :number
+   :default    -2
+   :required   true
+   :regexError "Chỉ nhập số nguyên từ -2 đến +3"
+   :priority   70}
+
+  ;; ─────────────────────────────────────────────────────────────────
+  ;; 6. BƯỚU HUYẾT THANH
+  ;; Chỉ xuất hiện trong giai đoạn muộn (CTC gần trọn hoặc trọn) để đánh giá cản trở
+  ;; ─────────────────────────────────────────────────────────────────
+  {:id       :buou_huyet_thanh
+   :label    "Tình trạng bướu huyết thanh"
+   :type     :select
+   :options  ["Không có" "Nhỏ" "Trung bình" "Lớn"]
+   :default  "Không có"
+   :required true
+   :priority 65}
+
+  ;; ─────────────────────────────────────────────────────────────────
+  ;; 7. TÌNH TRẠNG NƯỚC ỐI
+  ;; ─────────────────────────────────────────────────────────────────
+  {:id       :nuoc_oi
+   :label    "Tình trạng nước ối"
+   :type     :select
+   :options  ["Còn" "Đã vỡ"]
+   :default  "Còn"
+   :required true
+   :priority 60}
+
+  ;; ─────────────────────────────────────────────────────────────────
+  ;; 8. NGÀY GIỜ VỠ ỐI
+  ;; Tự động xuất hiện chỉ khi tình trạng nước ối được chọn là "Đã vỡ"
+  ;; ─────────────────────────────────────────────────────────────────
+  {:id         :gio_vo_oi
+   :label      "Ngày giờ vỡ ối (DD-MM-YYYY HH:mm)"
+   :type       :datetime
+   :form       "Datetime"
+   :required   true
+   :priority   50}
+
+  ;; ─────────────────────────────────────────────────────────────────
+  ;; 9. TÌNH TRẠNG KHUNG CHẬU
+  ;; ─────────────────────────────────────────────────────────────────
+  {:id       :khung_chau
+   :label    "Tình trạng khung chậu"
+   :type     :select
+   :options  ["Hẹp" "Giới hạn" "Bình thường"]
+   :default  "Bình thường"
+   :required true
+   :priority 40}
+
+  ;; ─────────────────────────────────────────────────────────────────
+  ;; 10. ƯỚC LƯỢNG CÂN NẶNG THAI NHI
+  ;; ─────────────────────────────────────────────────────────────────
+  {:id         :can_nang_thai
+   :label      "Ước lượng cân nặng thai nhi (gram, từ 500 đến 6000)"
+   :type       :number
+   :default    3000
+   :required   true
+   :regexError "Nhập số gram hợp lý từ 500 đến 6000"
+   :priority   30}
+ ]
+
+ :rules
+ [
+  ;; =================================================================
+  ;; NHÓM 1: LUẬT TÍNH TOÁN GIÁ TRỊ VÀ BIẾN ẨN (Hidden & Calculation Rules)
+  ;; =================================================================
+
+  ;; Luật 1.1: Tự động tính số giờ vỡ ối nếu nước ối đã vỡ và có giờ vỡ ối
+  ;; Biến :so_gio_vo_oi là biến ẩn (không hiển thị câu hỏi cho người dùng nhập)
+  {:id :rule-tinh-so-gio-vo-oi
+   :if [:= :nuoc_oi "Đã vỡ"]
+   :then {:so_gio_vo_oi [:sanh/tinh-gio-vo-oi :gio_vo_oi]}}
+
+  ;; Luật 1.2: Tiên lượng kiểu thế thuận lợi đối với ngôi Đầu
+  ;; Chỉ đánh giá khi CTC mở >= 6cm. Kiểu thế "Trước" được coi là thuận lợi.
+  {:id :rule-kieu-the-dau-thuan-loi
+   :if [:and [:= :ngoi_thai "Đầu"]
+             [:contains? ["Mở 6cm" "Mở 7cm" "Mở 8cm" "Gần trọn" "Trọn"] :do_mo_ctc]
+             [:contains? ["Chẩm trái trước" "Chẩm phải trước"] :kieu_the_dau]]
+   :then {:kieu_the_dau_thuan_loi true}}
+
+  ;; Luật 1.3: Tiên lượng kiểu thế KHÔNG thuận lợi đối với ngôi Đầu
+  {:id :rule-kieu-the-dau-khong-thuan-loi
+   :if [:and [:= :ngoi_thai "Đầu"]
+             [:contains? ["Mở 6cm" "Mở 7cm" "Mở 8cm" "Gần trọn" "Trọn"] :do_mo_ctc]
+             [:contains? ["Chẩm trái sau" "Chẩm phải sau" "Chẩm cùng" "Kiểu thế ngang"] :kieu_the_dau]]
+   :then {:kieu_the_dau_thuan_loi false}}
+
+  ;; Luật 1.4: Tiên lượng kiểu thế thuận lợi đối với ngôi Mông
+  {:id :rule-kieu-the-mong-thuan-loi
+   :if [:and [:= :ngoi_thai "Mông"]
+             [:contains? ["Mở 6cm" "Mở 7cm" "Mở 8cm" "Gần trọn" "Trọn"] :do_mo_ctc]
+             [:= :kieu_the_mong "Mông đủ"]]
+   :then {:kieu_the_mong_thuan_loi true}}
+
+  ;; Luật 1.5: Tiên lượng kiểu thế KHÔNG thuận lợi đối với ngôi Mông
+  {:id :rule-kieu-the-mong-khong-thuan-loi
+   :if [:and [:= :ngoi_thai "Mông"]
+             [:contains? ["Mở 6cm" "Mở 7cm" "Mở 8cm" "Gần trọn" "Trọn"] :do_mo_ctc]
+             [:!= :kieu_the_mong "Mông đủ"]]
+   :then {:kieu_the_mong_thuan_loi false}}
+
+  ;; Luật 1.6: Xác định tình trạng chuyển dạ hoạt động dựa vào độ mở và độ xóa
+  {:id :rule-chuyen-da-hoat-dong
+   :if [:and [:contains? ["Mở 2cm" "Mở 3cm" "Mở 4cm" "Mở 5cm" "Mở 6cm"] :do_mo_ctc]
+             [:contains? ["60%" "80%"] :do_xoa_ctc]]
+   :then {:chuyen_da_hoat_dong true}}
+
+  ;; Luật 1.7: Cảnh báo nguy cơ nhiễm trùng nếu ối vỡ kéo dài trên 12 tiếng
+  {:id :rule-nhiem-trung-oi-vo-lau
+   :if [:and [:= :nuoc_oi "Đã vỡ"]
+             [:> :so_gio_vo_oi 12]]
+   :then {:nguy_co_nhiem_trung true}}
+
+
+
+
+  ;; =================================================================
+  ;; NHÓM 2: LUẬT KẾT LUẬN LÂM SÀNG (Clinical Decision Rules - Goals)
+  ;; Tất cả đều ghi nhận kết quả vào biến mục tiêu :ket_luan
+  ;; =================================================================
+
+  ;; Luật 2.1: Ngôi thai bất thường (Ngôi ngang) -> Chỉ định mổ lấy thai lập tức
+  ;; Khi ngôi thai là Ngang, luật này được thỏa mãn ngay, hệ thống dừng lại và không cần hỏi thêm gì.
+  {:id :rule-ket-luan-ngoi-ngang
+   :if [:= :ngoi_thai "Ngang"]
+   :then {:ket_luan "Chỉ định mổ lấy thai khẩn cấp (Ngôi ngang không thể sinh thường)"}}
+
+  ;; Luật 2.2: Khung chậu hẹp -> Chỉ định mổ lấy thai
+  {:id :rule-ket-luan-khung-chau-hep
+   :if [:= :khung_chau "Hẹp"]
+   :then {:ket_luan "Chỉ định mổ lấy thai (Bất tương xứng đầu chậu do khung chậu hẹp)"}}
+
+  ;; Luật 2.3: Bất tương xứng đầu chậu do thai to trên khung chậu giới hạn -> Cân nhắc mổ
+  {:id :rule-ket-luan-thai-to-khung-chau-gioi-han
+   :if [:and [:= :khung_chau "Giới hạn"]
+             [:>= :can_nang_thai 3500]]
+   :then {:ket_luan "Cân nhắc mổ lấy thai (Bất tương xứng đầu chậu: khung chậu giới hạn & thai to >= 3500g)"}}
+
+  ;; Luật 2.4: Nhiễm trùng do ối vỡ lâu -> Chỉ định mổ hoặc can thiệp kháng sinh mạnh
+  {:id :rule-ket-luan-oi-vo-lau-nhiem-trung
+   :if [:= :nguy_co_nhiem_trung true]
+   :then {:ket_luan "Chỉ định mổ lấy thai kết hợp kháng sinh liều cao (Nguy cơ nhiễm trùng do ối vỡ lâu > 12 giờ)"}}
+
+  ;; Luật 2.5: Đủ điều kiện sinh thường ngả âm đạo (Thuận lợi tối đa)
+  {:id :rule-ket-luan-sinh-thuong-ngoi-dau
+   :if [:and [:= :ngoi_thai "Đầu"]
+             [:= :khung_chau "Bình thường"]
+             [:< :can_nang_thai 3500]
+             [:= :kieu_the_dau_thuan_loi true]
+             [:= :do_mo_ctc "Trọn"]
+             [:>= :do_lot 1]
+             [:contains? ["Không có" "Nhỏ"] :buou_huyet_thanh]]
+   :then {:ket_luan "Đủ điều kiện: Hướng dẫn sản phụ rặn đẻ thường và theo dõi sát ngôi thai"}}
+
+  ;; Luật 2.6: Đình trệ chuyển dạ giai đoạn II (Cổ tử cung mở trọn nhưng đầu không lọt + bướu huyết thanh lớn)
+  {:id :rule-ket-luan-dinh-tre-giai-doan-ii
+   :if [:and [:= :ngoi_thai "Đầu"]
+             [:= :do_mo_ctc "Trọn"]
+             [:<= :do_lot 0]
+             [:= :buou_huyet_thanh "Lớn"]]
+   :then {:ket_luan "Chỉ định mổ lấy thai (Chuyển dạ đình trệ giai đoạn II: cổ tử cung đã mở trọn nhưng đầu không lọt và có bướu huyết thanh lớn)"}}
+
+  ;; Luật 2.7: Tiếp tục theo dõi chuyển dạ bình thường (Các chỉ số chưa trọn vẹn nhưng không có bất thường)
+  ;; Nếu chưa mở trọn, và không có các yếu tố chỉ định mổ ở trên, hệ thống kết luận tiếp tục theo dõi.
+  {:id :rule-ket-luan-tiep-tuc-theo-doi
+   :require [:ngoi_thai :do_mo_ctc :khung_chau :can_nang_thai :nuoc_oi]
+   :if [:and [:or [:= :ngoi_thai "Đầu"] [:= :ngoi_thai "Mông"]]
+             [:!= :do_mo_ctc "Trọn"]
+             [:!= :khung_chau "Hẹp"]
+             [:not [:and [:= :nuoc_oi "Đã vỡ"]
+                         [:> :so_gio_vo_oi 12]]]
+             
+             ;; Bắt buộc phải có cân nặng thai nhi để theo dõi
+             :can_nang_thai
+             
+             ;; Độ xóa cổ tử cung (chỉ khi mở từ 2cm đến 6cm)
+             [:or [:not [:contains? ["Mở 2cm" "Mở 3cm" "Mở 4cm" "Mở 5cm" "Mở 6cm"] :do_mo_ctc]]
+                  :do_xoa_ctc]
+                  
+             ;; Kiểu thế đầu (chỉ khi ngôi Đầu và mở 6cm - Gần trọn)
+             [:or [:not [:and [:= :ngoi_thai "Đầu"]
+                              [:contains? ["Mở 6cm" "Mở 7cm" "Mở 8cm" "Gần trọn"] :do_mo_ctc]]]
+                  :kieu_the_dau]
+                  
+             ;; Kiểu thế mông (chỉ khi ngôi Mông và mở 6cm - Gần trọn)
+             [:or [:not [:and [:= :ngoi_thai "Mông"]
+                              [:contains? ["Mở 6cm" "Mở 7cm" "Mở 8cm" "Gần trọn"] :do_mo_ctc]]]
+                  :kieu_the_mong]
+                  
+             ;; Độ lọt (khi mở Gần trọn)
+             [:or [:not [:= :do_mo_ctc "Gần trọn"]]
+                  :do_lot]
+                  
+             ;; Bướu huyết thanh (khi mở Gần trọn)
+             [:or [:not [:= :do_mo_ctc "Gần trọn"]]
+                  :buou_huyet_thanh]]
+   :then {:ket_luan "Tiếp tục theo dõi sát tiến triển của cổ tử cung, độ xóa mở và tim thai"}}
+ ]}

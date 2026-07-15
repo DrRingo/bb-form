@@ -13,6 +13,7 @@
 (def executed-actions (atom #{}))
 
 ;; Formula and namespace registries
+(declare eval-expr)
 (def formula-registry (atom {}))
 (def ns-aliases (atom {}))
 
@@ -28,8 +29,9 @@
       (let [custom (edn/read-string (slurp file-path))]
         (merge-with merge default-theme custom))
       (catch Exception e
-        (println "⚠️ Lỗi khi nạp theme tùy chỉnh từ file:" file-path)
-        (println "Chi tiết:" (.getMessage e))
+        (binding [*out* *err*]
+          (println "⚠️ Lỗi khi nạp theme tùy chỉnh từ file:" file-path)
+          (println "Chi tiết:" (.getMessage e)))
         default-theme))
     default-theme))
 
@@ -41,7 +43,8 @@
             file (io/file cwd path)
             actual-ns (if (str/ends-with? path ".clj")
                         (do
-                          (println "📦 Đang nạp thư viện Clojure:" path)
+                          (binding [*out* *err*]
+                            (println "📦 Đang nạp thư viện Clojure:" path))
                           (load-file (str file))
                           (second (re-find #"\(ns\s+([\w\.\-]+)" (slurp file))))
                         (let [data (edn/read-string (slurp file))
@@ -49,7 +52,8 @@
                               consts (:consts data)
                               fns (:fns data)]
                           (when (and ns-name fns)
-                            (println "📦 Đang nạp thư viện EDN:" path)
+                            (binding [*out* *err*]
+                              (println "📦 Đang nạp thư viện EDN:" path))
                             (let [compiled-fns (into {}
                                                      (for [[k v] fns]
                                                        [k (eval `(let [~'consts '~consts] ~v))]))]
@@ -58,8 +62,9 @@
         (when (and alias-key actual-ns)
           (swap! ns-aliases assoc (name alias-key) actual-ns)))
       (catch Exception e
-        (println "⚠️ Lỗi khi nạp công thức từ cấu trúc:" import-decl)
-        (println "Chi tiết lỗi:" (.getMessage e))))))
+        (binding [*out* *err*]
+          (println "⚠️ Lỗi khi nạp công thức từ cấu trúc:" import-decl)
+          (println "Chi tiết lỗi:" (.getMessage e)))))))
 
 ;; Normalize values for string comparisons / dropdown display
 (defn normalize-str [v]
@@ -97,7 +102,7 @@
     (interpolate-string raw-text context)))
 
 (defn should-skip? [id]
-  (some? (get-in @answers [:selectedByUser (keyword id)])))
+  (contains? (:selectedByUser @answers) (keyword id)))
 
 (defn get-prefilled [id]
   (get-in @answers [:selectedByUser (keyword id)]))
@@ -198,13 +203,19 @@
              
       (= (count parts) 1)
       (let [p (first parts)]
-        (if (or (str/includes? p ":")
-                (str/includes? p "h")
-                (str/includes? p "H"))
-          (and (#{:datetime "datetime"} (keyword type))
-               (valid-time-str? p))
-          (and (#{:date :datetime "date" "datetime"} (keyword type))
-               (valid-date? (expand-date-shortcut p)))))
+        (if-let [m (re-matches #"^(\d{4})([hH]\d{4}(?:[+-]\d+)?)$" p)]
+          (let [d-part (nth m 1)
+                t-part (nth m 2)]
+            (and (#{:datetime "datetime"} (keyword type))
+                 (valid-date? (expand-date-shortcut d-part))
+                 (valid-time-str? t-part)))
+          (if (or (str/includes? p ":")
+                  (str/includes? p "h")
+                  (str/includes? p "H"))
+            (and (#{:datetime "datetime"} (keyword type))
+                 (valid-time-str? p))
+            (and (#{:date :datetime "date" "datetime"} (keyword type))
+                 (valid-date? (expand-date-shortcut p))))))
                
       :else false)))
 
@@ -218,11 +229,13 @@
           
           (= (count parts) 1)
           (let [p (first parts)]
-            (if (or (str/includes? p ":")
-                    (str/includes? p "h")
-                    (str/includes? p "H"))
-              {:date-str nil :time-str p}
-              {:date-str p :time-str nil}))
+            (if-let [m (re-matches #"^(\d{4})([hH]\d{4}(?:[+-]\d+)?)$" p)]
+              {:date-str (nth m 1) :time-str (nth m 2)}
+              (if (or (str/includes? p ":")
+                      (str/includes? p "h")
+                      (str/includes? p "H"))
+                {:date-str nil :time-str p}
+                {:date-str p :time-str nil})))
               
           :else
           {:date-str nil :time-str nil})
@@ -272,42 +285,69 @@
     v))
 
 ;; Returns the auto-fill value for a field in marathon mode
-(defn get-marathon-default [field]
-  (let [type             (keyword (:type field))
-        explicit-default (:default field)]
-    (cond
-      ;; info/hidden: bỏ qua - xử lý riêng trong run-terminal-form
-      (#{:info :hidden} type) nil
+(defn get-marathon-default
+  ([field] (get-marathon-default field nil))
+  ([field context]
+   (let [type             (keyword (:type field))
+         explicit-default (:default field)
+         resolved-default (if (and (vector? explicit-default) context)
+                            (eval-expr explicit-default context)
+                            explicit-default)]
+     (cond
+       ;; info/hidden: bỏ qua - xử lý riêng trong run-terminal-form
+       (#{:info :hidden} type) nil
 
-      ;; nếu có :default tường minh ⇒ parse và trả về
-      (some? explicit-default) (parse-value explicit-default (name type))
+       ;; nếu có :default tường minh ⇒ parse và trả về
+       (some? resolved-default) (parse-value resolved-default (name type))
 
-      ;; select / radio: lấy option đầu tiên
-      (#{:select :radio} type)
-      (first (mapv normalize-str (:options field)))
+       ;; nếu trường không bắt buộc và không có giá trị mặc định ⇒ trả về nil
+       (false? (:required field)) nil
 
-      ;; multiselect: vector chứa option đầu tiên
-      (= type :multiselect)
-      (when-let [first-opt (first (mapv normalize-str (:options field)))]
-        [first-opt])
+       ;; select / radio: lấy option đầu tiên
+       (#{:select :radio} type)
+       (first (mapv normalize-str (:options field)))
 
-      (= type :text)     ""
-      (= type :number)   0
-      (= type :date)     (today)
-      (= type :datetime) (let [now (java.time.LocalDateTime/now)]
-                           (.format now (java.time.format.DateTimeFormatter/ofPattern "dd-MM-yyyy HH:mm")))
+       ;; multiselect: vector chứa option đầu tiên
+       (= type :multiselect)
+       (when-let [first-opt (first (mapv normalize-str (:options field)))]
+         [first-opt])
 
-      :else nil)))
+       (= type :text)     ""
+       (= type :number)   0
+       (= type :date)     (today)
+       (= type :datetime) (let [now (java.time.LocalDateTime/now)]
+                            (.format now (java.time.format.DateTimeFormatter/ofPattern "dd-MM-yyyy HH:mm")))
+
+       :else nil))))
 (defn ->pattern [regex]
   (cond
     (instance? java.util.regex.Pattern regex) regex
     (string? regex) (re-pattern regex)
     :else nil))
 
-;; EDN logic evaluation engine
+(defn coerce-num [v]
+  (cond
+    (number? v) v
+    (string? v) (try (Long/parseLong v)
+                     (catch Exception _
+                       (try (Double/parseDouble v)
+                            (catch Exception _ 0))))
+    :else 0))
+
 (defn eval-expr [expr context]
-  (if-not (vector? expr)
-    expr
+  (cond
+    (not (vector? expr)) expr
+    (empty? expr) expr
+    ;; §11.2 Cú pháp rút gọn gọi hàm ngoài: [:ns/fn arg1 arg2 ...]
+    ;; Nếu phần tử đầu là keyword có namespace (ví dụ :sanh/tinh-gio), tự động
+    ;; chuyển thành [:call :ns/fn arg1 arg2 ...] để tái sử dụng logic :call.
+    ;; Loại trừ các namespace nội bộ của bb-form (:str) vì chúng được xử lý trực tiếp trong case.
+    (and (keyword? (first expr))
+         (namespace (first expr))
+         (not= (namespace (first expr)) "str"))
+    (eval-expr (into [:call] expr) context)
+    (not (keyword? (first expr))) (vec (map #(eval-expr % context) expr))
+    :else
     (let [[op & args] expr]
       (case op
         :var (let [var-key (keyword (first args))]
@@ -322,48 +362,130 @@
                (if (map? obj)
                  (get obj prop-key)
                  nil))
-        :and (every? #(eval-expr % context) args)
-        :or  (boolean (some #(eval-expr % context) args))
-        :not (not (eval-expr (first args) context))
-        :=   (apply = (map #(eval-expr % context) args))
-        :!=  (apply not= (map #(eval-expr % context) args))
-        :>   (apply > (map #(or (eval-expr % context) 0) args))
-        :<   (apply < (map #(or (eval-expr % context) 0) args))
-        :>=  (apply >= (map #(or (eval-expr % context) 0) args))
-        :<=  (apply <= (map #(or (eval-expr % context) 0) args))
-        :if  (if (eval-expr (first args) context)
-               (eval-expr (second args) context)
-               (eval-expr (nth args 2) context))
-        :+   (apply + (map #(or (eval-expr % context) 0) args))
-        :-   (apply - (map #(or (eval-expr % context) 0) args))
-        :*   (apply * (map #(or (eval-expr % context) 0) args))
-        :/   (apply / (map #(or (eval-expr % context) 0) args))
-        :mod (mod (or (eval-expr (first args) context) 0)
-                  (or (eval-expr (second args) context) 1))
-        :str/includes?  (str/includes? (str (eval-expr (first args) context)) (str (eval-expr (second args) context)))
-        :str/lower-case (str/lower-case (str (eval-expr (first args) context)))
-        :str/upper-case (str/upper-case (str (eval-expr (first args) context)))
-        :count  (count (eval-expr (first args) context))
-        :first  (first (eval-expr (first args) context))
-        :concat (apply concat (map #(eval-expr % context) args))
-        :array  (vec (map #(eval-expr % context) args))
+        :and (let [evaluated (mapv #(eval-expr % context) args)]
+               (cond
+                 (some #(= % false) evaluated) false
+                 (some #(= % :not-answered) evaluated) :not-answered
+                 :else true))
+        :or  (let [evaluated (mapv #(eval-expr % context) args)]
+               (cond
+                 (some (fn [v] (and (some? v) (not= v false) (not= v :not-answered))) evaluated) true
+                 (some #(= % :not-answered) evaluated) :not-answered
+                 :else false))
+        :not (let [v (eval-expr (first args) context)]
+               (if (= v :not-answered)
+                 :not-answered
+                 (not v)))
+        :=   (let [evaluated (mapv #(eval-expr % context) args)]
+               (if (some #(= % :not-answered) evaluated)
+                 :not-answered
+                 (apply = evaluated)))
+        :!=  (let [evaluated (mapv #(eval-expr % context) args)]
+               (if (some #(= % :not-answered) evaluated)
+                 :not-answered
+                 (apply not= evaluated)))
+        :>   (let [evaluated (mapv #(eval-expr % context) args)]
+               (if (some #(= % :not-answered) evaluated)
+                 :not-answered
+                 (apply > (map coerce-num evaluated))))
+        :<   (let [evaluated (mapv #(eval-expr % context) args)]
+               (if (some #(= % :not-answered) evaluated)
+                 :not-answered
+                 (apply < (map coerce-num evaluated))))
+        :>=  (let [evaluated (mapv #(eval-expr % context) args)]
+               (if (some #(= % :not-answered) evaluated)
+                 :not-answered
+                 (apply >= (map coerce-num evaluated))))
+        :<=  (let [evaluated (mapv #(eval-expr % context) args)]
+               (if (some #(= % :not-answered) evaluated)
+                 :not-answered
+                 (apply <= (map coerce-num evaluated))))
+        :if  (let [cond-val (eval-expr (first args) context)]
+               (if (= cond-val :not-answered)
+                 :not-answered
+                 (if cond-val
+                   (eval-expr (second args) context)
+                   (eval-expr (nth args 2) context))))
+        :+   (let [evaluated (mapv #(eval-expr % context) args)]
+               (if (some #(= % :not-answered) evaluated)
+                 :not-answered
+                 (apply + (map coerce-num evaluated))))
+        :-   (let [evaluated (mapv #(eval-expr % context) args)]
+               (if (some #(= % :not-answered) evaluated)
+                 :not-answered
+                 (apply - (map coerce-num evaluated))))
+        :*   (let [evaluated (mapv #(eval-expr % context) args)]
+               (if (some #(= % :not-answered) evaluated)
+                 :not-answered
+                 (apply * (map coerce-num evaluated))))
+        :/   (let [evaluated (mapv #(eval-expr % context) args)]
+               (if (some #(= % :not-answered) evaluated)
+                 :not-answered
+                 (apply / (map coerce-num evaluated))))
+        :mod (let [v1 (eval-expr (first args) context)
+                   v2 (eval-expr (second args) context)]
+               (if (or (= v1 :not-answered) (= v2 :not-answered))
+                 :not-answered
+                 (mod (or v1 0) (or v2 1))))
+        :str/includes?  (let [s1 (eval-expr (first args) context)
+                              s2 (eval-expr (second args) context)]
+                          (if (or (= s1 :not-answered) (= s2 :not-answered))
+                            :not-answered
+                            (str/includes? (str s1) (str s2))))
+        :str/lower-case (let [s (eval-expr (first args) context)]
+                          (if (= s :not-answered)
+                            :not-answered
+                            (str/lower-case (str s))))
+        :str/upper-case (let [s (eval-expr (first args) context)]
+                          (if (= s :not-answered)
+                            :not-answered
+                            (str/upper-case (str s))))
+        :count  (let [coll (eval-expr (first args) context)]
+                  (if (= coll :not-answered)
+                    :not-answered
+                    (count coll)))
+        :first  (let [coll (eval-expr (first args) context)]
+                  (if (= coll :not-answered)
+                    :not-answered
+                    (first coll)))
+        :concat (let [evaluated (mapv #(eval-expr % context) args)]
+                  (if (some #(= % :not-answered) evaluated)
+                    :not-answered
+                    (apply concat evaluated)))
+        :array  (let [evaluated (mapv #(eval-expr % context) args)]
+                  (if (some #(= % :not-answered) evaluated)
+                    :not-answered
+                    (vec evaluated)))
+        :exists (let [raw-key (eval-expr (first args) context)
+                      var-key (if (or (string? raw-key) (keyword? raw-key)) (keyword raw-key) raw-key)
+                      val (or (get-in context [:selectedByUser var-key])
+                              (get-in context [:HiddenVar var-key]))]
+                  (if (:solver context)
+                    (if (or (nil? val) (= val :not-answered))
+                      :not-answered
+                      true)
+                    (boolean (and (some? val) (not= val :not-answered)))))
         :contains? (let [coll (eval-expr (first args) context)
                           item (eval-expr (second args) context)]
-                     (if (set? coll)
-                       (contains? coll item)
-                       (some? (some #{item} coll))))
+                      (cond
+                        (or (= coll :not-answered) (= item :not-answered)) :not-answered
+                        (set? coll) (contains? coll item)
+                        :else (some? (some #{item} coll))))
+
         :call (let [[fn-path & fn-args] args
                     [raw-ns fn-name] (if (keyword? fn-path)
                                        [(namespace fn-path) (name fn-path)]
                                        [(namespace (str fn-path)) (name (str fn-path))])
                     ns-name (get @ns-aliases raw-ns raw-ns)
                     evaluated-args (map #(eval-expr % context) fn-args)]
-                (if-let [f-var (and ns-name fn-name (resolve (symbol ns-name fn-name)))]
-                  (apply @f-var evaluated-args)
-                  (if-let [f (get-in @formula-registry [(keyword ns-name) (keyword fn-name)])]
-                    (apply f evaluated-args)
-                    (throw (ex-info (str "Hàm không tồn tại trong namespace hoặc registry: " fn-path)
-                                    {:ns ns-name :fn fn-name :raw-ns raw-ns})))))
+                (if (some #(= % :not-answered) evaluated-args)
+                  :not-answered
+                  (if-let [f-var (and ns-name fn-name (resolve (symbol ns-name fn-name)))]
+                    (apply @f-var evaluated-args)
+                    (if-let [f (get-in @formula-registry [(keyword ns-name) (keyword fn-name)])]
+                      (apply f evaluated-args)
+                      (throw (ex-info (str "Hàm không tồn tại trong namespace hoặc registry: " fn-path)
+                                      {:ns ns-name :fn fn-name :raw-ns raw-ns}))))))
         :default true
         false))))
 
@@ -378,6 +500,150 @@
       :print (let [msg (eval-expr (first args) @context-atom)]
                ((:pause ui-adapter) msg))
       nil)))
+
+(defn eval-action-pure [action context]
+  (let [[op & args] action]
+    (case op
+      :set (let [var-name (first args)
+                 expr (second args)
+                 val (eval-expr expr context)]
+             (assoc-in context [:HiddenVar (keyword var-name)] val))
+      context)))
+
+(defn eval-actions-pure [actions context]
+  (reduce (fn [ctx act] (eval-action-pure act ctx)) context actions))
+
+(defn solve-stages [stages stage-idx field-idx context active-P]
+  (if (>= stage-idx (count stages))
+    (if (every? (fn [[k v]] (= (get-in context [:selectedByUser k]) v)) active-P)
+      context
+      nil)
+    (let [stage (nth stages stage-idx)
+          fields (:fields stage)]
+      (if (>= field-idx (count fields))
+        ;; End of stage: run on-complete, then move to next stage
+        (let [completed-context (if (:on-complete stage)
+                                  (eval-actions-pure (:on-complete stage) context)
+                                  context)]
+          (solve-stages stages (inc stage-idx) 0 completed-context active-P))
+        ;; In stage: run on-begin if field-idx is 0
+        (let [context (if (and (zero? field-idx) (:on-begin stage))
+                        (eval-actions-pure (:on-begin stage) context)
+                        context)
+              field (nth fields field-idx)
+              id (keyword (:id field))
+              type (keyword (:type field))
+              show-if (:show-if field)]
+          (if (or (nil? show-if) (eval-expr show-if context))
+            ;; Visible field
+            (cond
+              (= type :hidden)
+              (let [calc-val (eval-expr (:value field) context)
+                    next-context (assoc-in context [:selectedByUser id] calc-val)
+                    next-context (if (:actions field)
+                                   (eval-actions-pure (:actions field) next-context)
+                                   next-context)]
+                (solve-stages stages stage-idx (inc field-idx) next-context active-P))
+
+              (= type :info)
+              (let [label-val (resolve-label (:label field) context)
+                    next-context (assoc-in context [:selectedByUser id] label-val)
+                    next-context (if (:actions field)
+                                   (eval-actions-pure (:actions field) next-context)
+                                   next-context)]
+                (solve-stages stages stage-idx (inc field-idx) next-context active-P))
+
+              :else
+              (if (contains? active-P id)
+                ;; Case 1: Prefilled
+                (let [val (get active-P id)
+                      options (:options field)]
+                  (if (seq options)
+                    (if-let [matching-opt (first (filter #(= (normalize-str %) (normalize-str val)) options))]
+                      (let [next-context (assoc-in context [:selectedByUser id] matching-opt)
+                            next-context (if (:actions field)
+                                           (eval-actions-pure (:actions field) next-context)
+                                           next-context)]
+                        (solve-stages stages stage-idx (inc field-idx) next-context active-P))
+                      nil) ;; Invalid prefilled option
+                    (let [next-context (assoc-in context [:selectedByUser id] val)
+                          next-context (if (:actions field)
+                                         (eval-actions-pure (:actions field) next-context)
+                                         next-context)]
+                      (solve-stages stages stage-idx (inc field-idx) next-context active-P))))
+                ;; Case 2: Not prefilled
+                (let [options (:options field)]
+                  (if (seq options)
+                    (let [user-val (get-in context [:prefilled id])
+                          default-val (let [d (:default field)]
+                                        (if (vector? d)
+                                          (eval-expr d context)
+                                          d))
+                          user-opt (when user-val (first (filter #(= (normalize-str %) (normalize-str user-val)) options)))
+                          default-opt (when default-val (first (filter #(= (normalize-str %) (normalize-str default-val)) options)))
+                          ordered-opts (cond-> []
+                                         user-opt (conj user-opt)
+                                         default-opt (conj default-opt)
+                                         :always (into options)
+                                         :always distinct)]
+                      (some (fn [opt]
+                              (let [next-context (assoc-in context [:selectedByUser id] opt)
+                                    next-context (if (:actions field)
+                                                   (eval-actions-pure (:actions field) next-context)
+                                                   next-context)]
+                                (solve-stages stages stage-idx (inc field-idx) next-context active-P)))
+                            ordered-opts))
+                    (let [user-val (get-in context [:prefilled id])
+                          def-val (if (some? user-val) user-val (get-marathon-default field context))
+                          next-context (assoc-in context [:selectedByUser id] def-val)
+                          next-context (if (:actions field)
+                                         (eval-actions-pure (:actions field) next-context)
+                                         next-context)]
+                      (solve-stages stages stage-idx (inc field-idx) next-context active-P))))))
+            ;; Hidden field
+            (let [next-context (update context :selectedByUser dissoc id)]
+              (solve-stages stages stage-idx (inc field-idx) next-context active-P))))))))
+
+(defn find-path
+  ([form prefilled-map] (find-path form prefilled-map true))
+  ([form prefilled-map marathon?]
+   (let [stages (or (:stages form) [{:fields (:fields form)}])
+         all-fields (mapcat :fields stages)
+         field-priorities (into {} (map (fn [f] [(keyword (:id f)) (get f :priority 0)]) all-fields))
+         field-priority (fn [field-id] (get field-priorities (keyword field-id) 0))
+         field-types (into {} (map (fn [f] [(keyword (:id f)) (keyword (:type f))]) all-fields))
+         clean-prefilled (into {} (filter (fn [[_ v]] (some? v)) prefilled-map))
+         parsed-prefilled (into {} (for [[k v] clean-prefilled]
+                                     [k (parse-value v (get field-types k :text))]))
+         all-keys (keys parsed-prefilled)
+         field-order (into {} (map-indexed (fn [idx field] [(keyword (:id field)) idx]) all-fields))
+         ;; Sort keys from highest priority (largest priority then largest index) to lowest priority
+         prioritized-keys (sort-by (fn [k]
+                                     [(- (field-priority k))
+                                      (- (get field-order (keyword k) -1))])
+                                   all-keys)]
+     (let [final-accepted
+           (reduce (fn [accepted k]
+                     (let [test-accepted (assoc accepted k (get parsed-prefilled k))
+                           initial-context {:selectedByUser {}
+                                            :HiddenVar (get form :variables {})
+                                            :prefilled parsed-prefilled}
+                           result-context (solve-stages stages 0 0 initial-context test-accepted)
+                           result-answers (:selectedByUser result-context)]
+                       (if (and result-context
+                                (every? (fn [[tk tv]] (= (get result-answers tk) tv)) test-accepted))
+                         test-accepted
+                         accepted)))
+                   {}
+                   prioritized-keys)]
+       (if marathon?
+         (let [final-context (solve-stages stages 0 0
+                                           {:selectedByUser {}
+                                            :HiddenVar (get form :variables {})
+                                            :prefilled parsed-prefilled}
+                                           final-accepted)]
+           (or (:selectedByUser final-context) {}))
+         final-accepted)))))
 
 (defn eval-actions [actions context-atom ui-adapter]
   (doseq [act actions]
@@ -423,9 +689,8 @@
                                     (let [id-k     (keyword id)
                                           auto-val (if (= type :info)
                                                      (resolve-label (:label field) @answers-atom)
-                                                     (get-marathon-default field))]
-                                      (when (some? auto-val)
-                                        (swap! answers-atom assoc-in [:selectedByUser id-k] auto-val))
+                                                     (get-marathon-default field @answers-atom))]
+                                      (swap! answers-atom assoc-in [:selectedByUser id-k] auto-val)
                                       (when (:actions field)
                                         (eval-actions (:actions field) answers-atom ui-adapter))
                                       (swap! executed-actions conj id)

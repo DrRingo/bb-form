@@ -1,0 +1,460 @@
+#+TITLE: Thiết Kế Chức Năng Expert System Cho bb-form
+#+AUTHOR: Antigravity & DrRingo
+#+DATE: 2026-07-14
+
+* 1. Tổng Quan Ý Tưởng (Overview)
+
+Hiện tại, =bb-form= đang điều hướng các câu hỏi xuất hiện trên giao diện người dùng bằng từ khóa ~:show-if~ ở mỗi trường (field). Cách tiếp cận này tuy đơn giản, trực quan cho các bộ câu hỏi ngắn, nhưng bộc lộ nhiều hạn chế khi bộ câu hỏi phình to và các ràng buộc logic phức tạp đan xen:
+- *Trùng lặp logic*: Nhiều câu hỏi có chung điều kiện xuất hiện phải lặp lại cấu trúc ~:show-if~ giống nhau.
+- *Khó bảo trì*: Khi luật lâm sàng thay đổi, người dùng phải đi sửa ~:show-if~ ở rất nhiều trường.
+- *Thiếu khả năng suy luận động*: Khó giải quyết các bài toán ẩn (nhập giá trị này thì suy ra ngay kết quả kia mà không cần hỏi các câu hỏi trung gian).
+
+*Ý tưởng mới: Giao phó logic cho một Expert System (Hệ chuyên gia)*
+Thay vì chỉ định thủ công khi nào câu hỏi xuất hiện, người dùng chỉ cần khai báo:
+1. *Tập câu hỏi (Fields)* định nghĩa các thông tin có thể thu thập từ người dùng kèm theo mức độ ưu tiên mặc định (~:priority~).
+2. *Mục tiêu (Goals)* là các kết luận hoặc biến số cần tìm ra kết quả (ví dụ: ~:ket_luan~, ~:huong_xu_tri~).
+3. *Tập luật (Rules)* định nghĩa mối quan hệ logic giữa các câu hỏi, các biến ẩn (hidden/derived variables) và mục tiêu.
+
+=bb-form= sẽ chạy ở chế độ nâng cao ~--expert~ để tự động giải Expert System này, quyết định câu hỏi nào cần xuất hiện tiếp theo sao cho *số lượng câu hỏi người dùng phải trả lời là ít nhất*, đồng thời đảm bảo *thứ tự câu hỏi không bị xáo trộn ngẫu nhiên* làm mất tính mạch lạc của quá trình khám/hỏi bệnh.
+
+* 2. Kiến Trúc & Công Nghệ (Architecture & Technology)
+
+** 2.1. Lựa chọn Engine: O'Doyle Rules
+Để đảm bảo khả năng chạy mượt mà trên môi trường hạn chế của *Babashka* (không hỗ trợ JVM class generation động như Clara Rules yêu cầu), chúng ta lựa chọn [[https://github.com/oakes/odoyle-rules][O'Doyle Rules]].
+- *Ưu điểm*:
+  - Tương thích hoàn toàn với Babashka.
+  - Sử dụng mô hình RETE hiệu năng cao.
+  - Cấu trúc Fact đơn giản dạng bộ ba: ~[entity attribute value]~ (trong trường hợp của chúng ta sẽ là ~[::session field-id value]~).
+  - Dung lượng nhẹ, dễ tích hợp.
+
+** 2.2. Cơ chế Giải câu hỏi (Solver Mechanism)
+Vì O'Doyle Rules là một engine dạng *Forward-Chaining* (suy diễn tiến), nó sẽ tự động chạy khi ta đưa dữ liệu vào để tìm ra các kết luận mới.
+Tuy nhiên, để tạo ra một bảng hỏi thông minh (Goal-Driven / Backward-Chaining style), ta cần một lớp wrapper bên ngoài thực hiện giải thuật phụ thuộc ngược:
+1. *Định nghĩa Goal*: Xác định các biến mục tiêu (ví dụ: ~:ket_luan~).
+2. *Phân tích sự phụ thuộc (Dependency Analysis)*:
+   - Từ các luật kết luận ra Goal, tìm xem các điều kiện ở vế trái (LHS) cần những biến đầu vào nào.
+   - Nếu biến đầu vào đó là một biến ẩn (chưa biết), tìm tiếp các luật sinh ra biến ẩn đó.
+   - Nếu biến đầu vào đó là một trường nhập liệu (field) chưa có câu trả lời, nó sẽ được đưa vào tập hợp *câu hỏi tiềm năng (candidate questions)*.
+3. *Giữ trật tự câu hỏi (Logical Question Ordering)*:
+   - Để tránh việc hệ thống hỏi nhảy cóc hỗn loạn (ví dụ: hỏi tiền sử bệnh trước rồi đột ngột hỏi cân nặng thai nhi, sau đó lại quay lại tiền sử), ta sẽ sắp xếp tập hợp câu hỏi tiềm năng theo thứ tự khai báo trong ~:fields~ hoặc theo thuộc tính ~:priority~ đã định nghĩa sẵn.
+   - Câu hỏi có độ ưu tiên cao nhất trong số các câu hỏi tiềm năng sẽ được chọn để hỏi người dùng.
+4. *Cập nhật phiên làm việc*:
+   - Người dùng trả lời câu hỏi -> Giá trị được nạp vào phiên làm việc O'Doyle Rules dưới dạng Fact.
+   - Chạy O'Doyle Rules để kích hoạt suy diễn. Nếu Goal đã được thỏa mãn (hoặc tất cả các luật dẫn tới Goal đã bị phủ định - falsified), biểu mẫu kết thúc. Nếu chưa, lặp lại bước 2 để tìm câu hỏi tiếp theo.
+
+* 3. Thiết Kế Cú Pháp EDN Thống Nhất (Unified Rules DSL)
+
+Để tránh phụ thuộc chặt chẽ vào cú pháp của O'Doyle Rules (phòng trường hợp tương lai đổi sang engine khác), chúng ta thiết kế một DSL EDN độc lập, thống nhất và dễ đọc cho người dùng.
+
+** 3.1. Các từ khóa cấu trúc mới trong file EDN
+- ~:goals~: Danh sách các keyword chứa các biến đích cần tìm ra.
+- ~:rules~: Danh sách các luật định nghĩa logic của hệ thống.
+
+** 3.2. Cấu trúc một Rule
+Mỗi rule là một map gồm các thuộc tính:
+- ~:id~: Định danh duy nhất cho luật (keyword).
+- ~:if~: Điều kiện kích hoạt (LHS). Hỗ trợ các biểu thức logic lồng nhau:
+  - Các phép toán so sánh: ~:=~, ~:!=~, ~:>~, ~:<~, ~:>=~, ~:<=~.
+  - Các phép toán logic: ~:and~, ~:or~, ~:not~.
+  - Các hàm kiểm tra đặc biệt: ~:contains?~, ~:exists~.
+  - Gọi các hàm logic ngoài: hỗ trợ cú pháp gọi hàm Clojure từ file import bên ngoài trực tiếp qua namespace alias (ví dụ: ~[:sanh/kiem-tra-nguy-co :ngoi_thai :can_nang_thai]~) hoặc dùng từ khóa ~[:call ...]~.
+  - Biến số được viết trực tiếp dưới dạng keyword đại diện cho ID của field (không cần bọc trong ~[:var :id]~ như trước).
+- ~:then~: Kết quả khi luật thỏa mãn (RHS). Là một map gán giá trị cho các biến ẩn hoặc biến mục tiêu.
+  - Ví dụ: ~{:ket_luan "Mổ lấy thai"}~
+  - Hỗ trợ gọi hàm tính toán động: ~{:so_gio_vo_oi [:call :sanh/tinh-gio-vo-oi :gio_vo_oi]}~.
+
+* 4. Ví Dụ So Sánh (Comparative Example)
+
+Hãy so sánh sự khác biệt giữa cách viết cũ sử dụng ~:show-if~ / ~:value~ và cách viết mới sử dụng Expert System.
+
+** 4.1. Cách viết cũ (Trích đoạn sanh.edn)
+#+BEGIN_SRC clojure
+{:title "Đánh Giá Tình Trạng Chuyển Dạ"
+ :fields
+ [
+  {:id       :ngoi_thai
+   :label    "Ngôi thai"
+   :type     :select
+   :options  ["Đầu" "Mông" "Ngang" "Chưa xác định"]
+   :priority 100}
+
+  {:id       :do_mo_ctc
+   :label    "Độ mở CTC"
+   :type     :select
+   :options  ["Đóng" "Mở 2cm" "Mở 3cm" "Mở 4cm" "Mở 5cm" "Trọn"]
+   :priority 60
+   :show-if  [:or [:= [:var :ngoi_thai] "Đầu"]
+                  [:= [:var :ngoi_thai] "Mông"]]}
+
+  {:id       :gio_vo_oi
+   :label    "Ngày giờ vỡ ối"
+   :type     :datetime
+   :priority 20
+   :show-if  [:= [:var :nuoc_oi] "Đã vỡ"]}
+
+  {:id    :so_gio_vo_oi
+   :type  :hidden
+   :value [:call :sanh/tinh-gio-vo-oi [:var :gio_vo_oi]]
+   :show-if [:= [:var :nuoc_oi] "Đã vỡ"]}
+ ]}
+#+END_SRC
+
+** 4.2. Cách viết mới dưới chế độ --expert (sanh_expert.edn)
+#+BEGIN_SRC clojure
+{:title "Đánh Giá Tình Trạng Chuyển Dạ"
+ :goals [:ket_luan]
+ :fields
+ [
+  {:id       :ngoi_thai
+   :label    "Ngôi thai"
+   :type     :select
+   :options  ["Đầu" "Mông" "Ngang" "Chưa xác định"]
+   :priority 100}
+
+  {:id       :do_mo_ctc
+   :label    "Độ mở CTC"
+   :type     :select
+   :options  ["Đóng" "Mở 2cm" "Mở 3cm" "Mở 4cm" "Mở 5cm" "Trọn"]
+   :priority 80}
+
+  {:id       :nuoc_oi
+   :label    "Tình trạng nước ối"
+   :type     :select
+   :options  ["Còn" "Đã vỡ"]
+   :priority 60}
+
+  {:id       :gio_vo_oi
+   :label    "Ngày giờ vỡ ối"
+   :type     :datetime
+   :priority 40}
+ ]
+
+ :rules
+ [
+  ;; --- LUẬT ẨN / TÍNH TOÁN GIÁ TRỊ (Hidden Logic) ---
+  {:id :rule-tinh-gio-vo-oi
+   :if [:and [:= :nuoc_oi "Đã vỡ"]
+             [:exists :gio_vo_oi]]
+   :then {:so_gio_vo_oi [:call :sanh/tinh-gio-vo-oi :gio_vo_oi]}}
+
+  ;; --- LUẬT KẾT LUẬN LÂM SÀNG (Goals Logic) ---
+  ;; Nếu ngôi ngang -> Chỉ định mổ luôn (Không cần hỏi độ mở CTC hay ối)
+  {:id :rule-ngoi-ngang
+   :if [:= :ngoi_thai "Ngang"]
+   :then {:ket_luan "Mổ lấy thai khẩn cấp"}}
+
+  ;; Nếu ngôi đầu/mông và mở trọn -> Sinh thường
+  {:id :rule-sinh-thuong
+   :if [:and [:or [:= :ngoi_thai "Đầu"]
+                  [:= :ngoi_thai "Mông"]]
+             [:= :do_mo_ctc "Trọn"]]
+   :then {:ket_luan "Theo dõi sinh thường qua ngả âm đạo"}}
+ ]}
+#+END_SRC
+
+*Phân tích luồng chạy tối giản câu hỏi của Hệ chuyên gia:*
+1. Hệ thống thấy mục tiêu là ~:ket_luan~.
+2. Để tìm ~:ket_luan~, nó phân tích hai luật: ~:rule-ngoi-ngang~ và ~:rule-sinh-thuong~.
+   - ~:rule-ngoi-ngang~ cần ~:ngoi_thai~.
+   - ~:rule-sinh-thuong~ cần ~:ngoi_thai~ và ~:do_mo_ctc~.
+   - Nhận thấy ~:ngoi_thai~ là giao lộ chung và có ~:priority~ cao nhất (100). Hệ thống chọn hỏi ~:ngoi_thai~ đầu tiên.
+3. Người dùng trả lời:
+   - *Kịch bản A*: Người dùng chọn ~"Ngang"~.
+     - Fact ~[:ngoi_thai "Ngang"]~ được đưa vào O'Doyle.
+     - Luật ~:rule-ngoi-ngang~ kích hoạt -> Sinh ra kết luận ~{:ket_luan "Mổ lấy thai khẩn cấp"}~.
+     - Đã đạt được Goal. Hệ thống lập tức dừng lại và hiển thị kết quả. *Số câu hỏi đã hỏi: 1*. (Bỏ qua hoàn toàn độ mở CTC, tình trạng nước ối, giờ vỡ ối).
+   - *Kịch bản B*: Người dùng chọn ~"Đầu"~.
+     - Fact ~[:ngoi_thai "Đầu"]~ được nạp vào.
+     - Luật ~:rule-ngoi-ngang~ bị loại trừ (do điều kiện sai).
+     - Luật ~:rule-sinh-thuong~ vẫn có thể đúng, nhưng cần thêm ~:do_mo_ctc~.
+     - Hệ thống tiếp tục hỏi ~:do_mo_ctc~ (câu hỏi tiếp theo).
+
+* 5. Phương Án Biên Dịch Sang O'Doyle Rules (Compilation Strategy)
+
+Khi khởi chạy với flag ~--expert~, bộ biên dịch của =bb-form= sẽ tự động sinh mã nguồn Clojure/O'Doyle như sau:
+
+** 5.1. Mô hình Fact
+Tất cả các biến trạng thái (câu trả lời, biến ẩn, biến đích) đều được biểu diễn thống nhất:
+#+BEGIN_SRC clojure
+;; Fact template in O'Doyle: [entity attribute value]
+;; Thực thể luôn là ::session để đại diện cho phiên làm việc hiện tại
+[::session :ngoi_thai "Đầu"]
+[::session :so_gio_vo_oi 4]
+#+END_SRC
+
+** 5.2. Chuyển đổi Vế Trái (LHS Compiler)
+Bộ chuyển đổi sẽ phân tích cú pháp biểu thức `:if` và map thành mệnh đề ~:what~ và ~:when~ của O'Doyle.
+
+Ví dụ luật ~:rule-sinh-thuong~:
+#+BEGIN_SRC clojure
+;; Từ định nghĩa EDN:
+{:id :rule-sinh-thuong
+ :if [:and [:or [:= :ngoi_thai "Đầu"] [:= :ngoi_thai "Mông"]]
+           [:= :do_mo_ctc "Trọn"]]
+ :then {:ket_luan "Theo dõi sinh thường"}}
+
+;; Biên dịch ra mã O'Doyle Rules:
+(o/ruleset
+  {::rule-sinh-thuong
+   [:what
+    [::session :ngoi_thai ngoi_thai]
+    [::session :do_mo_ctc do_mo_ctc]
+    :when
+    (and (or (= ngoi_thai "Đầu") (= ngoi_thai "Mông"))
+         (= do_mo_ctc "Trọn"))
+    :then
+    (o/insert! ::session :ket_luan "Theo dõi sinh thường")]})
+#+END_SRC
+
+* 6. Thuật Toán Tìm Câu Hỏi Tiếp Theo (Next Question Algorithm)
+
+Để giải quyết bài toán "tìm câu hỏi tiếp theo một cách tối ưu", chúng ta sử dụng thuật toán phân tích sự phụ thuộc tĩnh kết hợp với trạng thái động của RETE network:
+
+#+BEGIN_SRC mermaid
+graph TD
+    A([Bắt đầu lượt]) --> B[Nạp các câu trả lời hiện tại vào O'Doyle Session]
+    B --> C[Chạy o/fire-rules]
+    C --> D{Mục tiêu :goals đã có giá trị?}
+    D -- Có --> E([Kết thúc Form & Xuất kết quả])
+    D -- Chưa --> F[Lấy danh sách các luật dẫn đến Goal chưa được thỏa mãn]
+    F --> G[Phân tích LHS của các luật này để tìm các biến chưa có giá trị]
+    G --> H[Lọc ra các biến là trường nhập liệu thực tế :fields]
+    H --> I[Sắp xếp danh sách biến theo thứ tự ưu tiên :priority và vị trí khai báo]
+    I --> J[Chọn biến đầu tiên làm Câu hỏi tiếp theo]
+    J --> K[Hiển thị câu hỏi cho người dùng]
+    K --> L[Nhận câu trả lời từ người dùng]
+    L --> A
+#+END_SRC
+
+** Chi tiết các bước của thuật toán trong mỗi vòng lặp:
+1. *Bước 1: Nạp & Chạy*:
+   - Đưa tất cả câu trả lời của người dùng hiện có vào một O'Doyle session mới (hoặc update session cũ).
+   - Gọi ~(o/fire-rules session)~.
+2. *Bước 2: Kiểm tra dừng*:
+   - Đọc giá trị của các biến trong tập ~:goals~ từ session.
+   - Nếu tất cả các mục tiêu đã có giá trị, hoặc không còn luật nào có khả năng kích hoạt để thay đổi giá trị mục tiêu, dừng khảo sát.
+3. *Bước 3: Xác định tập câu hỏi ứng viên (Candidate Inputs)*:
+   - Duyệt qua danh sách các luật (~:rules~).
+   - Loại bỏ các luật đã chắc chắn sai (ví dụ: luật yêu cầu ~[:= :ngoi_thai "Ngang"]~ nhưng người dùng đã trả lời ~"Đầu"~).
+   - Với các luật còn có cơ hội đúng (hoặc chưa biết):
+     - Thu thập các biến xuất hiện ở LHS của luật này mà hiện thời *chưa có giá trị* trong session.
+     - Nếu một biến là biến ẩn (không nằm trong `:fields` nhưng được sinh ra bởi một luật khác), ta sẽ đệ quy truy vết các biến đầu vào của luật sinh ra nó.
+     - Gom tất cả các biến là trường nhập liệu thực tế (~:fields~) thu được vào tập ~CandidateInputs~.
+4. *Bước 4: Sắp xếp & Chọn lựa*:
+   - Sắp xếp ~CandidateInputs~ theo độ ưu tiên giảm dần của trường (~:priority~). Nếu trùng độ ưu tiên, sắp xếp theo thứ tự xuất hiện của trường đó trong mảng ~:fields~.
+   - Chọn biến đứng đầu danh sách làm câu hỏi tiếp theo để trình bày cho người dùng.
+
+* 7. Tương Thích Ngược & Giao Diện Người Dùng (Backward Compatibility)
+
+- *Chế độ mặc định (Standard mode)*: Nếu chạy ~bb-form sanh.edn~ không có flag ~--expert~, hệ thống hoạt động như cũ. Đọc thuộc tính ~:show-if~ để điều hướng tuần tự.
+- *Chế độ chuyên gia (Expert mode)*: Kích hoạt bằng câu lệnh:
+  #+BEGIN_SRC bash
+  bb-form sanh.edn --expert --engine gum
+  #+END_SRC
+  Khi chạy chế độ này:
+  - Bỏ qua toàn bộ thuộc tính ~:show-if~ cũ của các fields.
+  - Sử dụng module solver hệ chuyên gia để điều phối luồng hỏi dựa trên mục ~:goals~ và ~:rules~.
+  - Điều này giúp nhà phát triển có thể viết chung cả hai loại logic trong cùng một file EDN để vừa tương thích ngược vừa sẵn sàng nâng cấp.
+
+- *Kết hợp chế độ Chuyên gia và Marathon (`--expert` chạy cùng `--marathon`)*:
+  Người dùng có thể chạy kết hợp hai chế độ này bằng câu lệnh:
+  #+BEGIN_SRC bash
+  bb-form sanh.edn --expert --marathon --values answers.edn --out result.edn
+  #+END_SRC
+  Khi chạy kết hợp:
+  - Hệ thống sẽ hoạt động hoàn toàn tự động (không tương tác với người dùng qua giao diện terminal/winform).
+  - Đầu tiên, nạp các giá trị đã trả lời sẵn từ file `--values` vào O'Doyle Session.
+  - Giải thuật Solver sẽ tìm các câu hỏi ứng viên cần thiết để quyết định `:goals`.
+  - Thay vì hiển thị câu hỏi cho người dùng, đối với mỗi câu hỏi ứng viên chưa có giá trị, hệ thống sẽ **tự động lấy giá trị mặc định** (`:default`) hoặc giá trị tối thiểu của trường đó (như phần tử đầu tiên của dropdown, số nhỏ nhất, v.v.), tương tự như cơ chế marathon truyền thống.
+  - Các giá trị điền tự động này được nạp tiếp làm Fact để O'Doyle Rules tiếp tục suy diễn cho đến khi Goal đạt được giá trị cuối cùng.
+  - Kết quả cuối cùng (bao gồm cả các câu trả lời tự điền và kết luận cuối cùng `:ket_luan`) được lưu thẳng ra file đầu ra.
+  - Chế độ này cực kỳ hữu ích cho việc **kiểm thử tự động hàng loạt (batch simulation testing)** các kịch bản lâm sàng mà không cần con người can thiệp.
+
+* 8. Xử Lý Giá Trị Mặc Định & Trường Tùy Chọn (Defaults & Optional Fields)
+
+Trong môi trường Hệ chuyên gia, việc xử lý các trường không bắt buộc (~:required false~) hoặc có giá trị mặc định (~:default~) cần tuân thủ các nguyên tắc sau:
+- *Giá trị mặc định (~:default~)*:
+  - Khi một trường là ứng viên hỏi tiếp theo và có giá trị mặc định, giao diện hiển thị sẽ gợi ý sẵn giá trị này.
+  - Nếu người dùng nhấn Enter để bỏ qua, giá trị mặc định sẽ được nạp thành một Fact vào O'Doyle Session.
+  - Điều này tránh việc hệ thống bị tắc nghẽn (stuck) khi giải hệ luật.
+- *Trường tùy chọn (~:required false~)*:
+  - Nếu một biến ở LHS của luật là trường tùy chọn và người dùng chọn bỏ qua (không điền), hệ thống sẽ nạp một Fact chứa giá trị ~nil~ cho biến đó.
+  - Các luật có điều kiện liên quan đến trường này sẽ nhận giá trị ~nil~ và tự động tính toán (ví dụ: luật có thể sử dụng hàm ~:exists~ để kiểm tra xem trường đó đã được điền hay chưa).
+
+** 8.1. Các phương án xử lý Giá trị mặc định động (Dynamic Defaults)
+Trong thực tế lâm sàng, giá trị mặc định của một câu hỏi có thể thay đổi động phụ thuộc vào câu trả lời của các câu hỏi trước đó (ví dụ: mặc định độ xóa CTC là 80% nếu CTC đã mở từ 7cm trở lên, ngược lại là 60%). =bb-form= hỗ trợ hai phương án khai báo linh hoạt:
+
+*** Phương án A: Khai báo biểu thức động trực tiếp tại thuộc tính `:default` của Field (Cơ chế cũ)
+Người dùng khai báo biểu thức tính toán (như hàm `[:if ...]`, `[:call ...]`) ngay tại thuộc tính `:default` của trường:
+#+BEGIN_SRC clojure
+;; Khai báo biểu thức động ở trường :do_xoa_ctc
+{:id       :do_xoa_ctc
+ :type     :select
+ :options  ["50%" "60%" "80%"]
+ :default  [:if [:or [:= :do_mo_ctc "Mở 7cm"] [:= :do_mo_ctc "Mở 8cm"]]
+                "80%"
+                "60%"]}
+#+END_SRC
+- *Cơ chế hoạt động của Solver*:
+  1. Khi duyệt cây phụ thuộc, Solver sẽ phân tích biểu thức ở mục `:default` này để trích xuất các biến phụ thuộc (ở đây là `:do_mo_ctc`).
+  2. Solver tự động thêm các biến phụ thuộc này vào danh sách tiền đề của `:do_xoa_ctc`. Điều này đảm bảo hệ thống bắt buộc phải hỏi `:do_mo_ctc` trước, sau đó mới hiển thị `:do_xoa_ctc` với giá trị mặc định đã được tính toán chính xác.
+  3. Khi câu hỏi xuất hiện trên UI (hoặc chạy trong chế độ `--marathon`), giá trị mặc định được tính bằng cách evaluate biểu thức EDN dựa trên các Fact hiện có.
+
+*** Phương án B: Khai báo giá trị mặc định dưới dạng một Rule (Cơ chế Hệ chuyên gia)
+Thay vì nhúng biểu thức logic vào cấu trúc trường, người dùng viết một luật riêng biệt để gán giá trị mặc định khi điều kiện thỏa mãn VÀ người dùng chưa nhập giá trị:
+#+BEGIN_SRC clojure
+;; Luật gán giá trị mặc định cho độ xóa CTC
+{:id :rule-default-do-xoa-active
+ :if [:and [:not [:exists :do_xoa_ctc]] ; Điều kiện: chưa có câu trả lời cho trường này
+           [:contains? ["Mở 7cm" "Mở 8cm"] :do_mo_ctc]]
+ :then {:do_xoa_ctc "80%"}}
+#+END_SRC
+- *Cơ chế hoạt động của Solver*:
+  1. Đây là một luật thông thường. Solver sẽ tự động suy diễn khi `:do_mo_ctc` có giá trị.
+  2. Nếu người dùng không nhập gì cho `:do_xoa_ctc` (hoặc hệ thống chạy tự động) và `:do_mo_ctc` là "Mở 7cm", luật này sẽ tự kích hoạt và chèn Fact `[:do_xoa_ctc "80%"]` vào Session.
+  3. Do `:do_xoa_ctc` lúc này đã có giá trị trong Session, Solver sẽ loại `:do_xoa_ctc` ra khỏi danh sách câu hỏi cần hỏi. Người dùng thậm chí không cần phải tương tác với câu hỏi này nữa.
+
+- *So sánh và Khuyên dùng*:
+  - **Phương án A**: Thích hợp khi bạn vẫn muốn câu hỏi **hiển thị ra màn hình** để người dùng xác nhận hoặc sửa lại giá trị mặc định động đó.
+  - **Phương án B**: Thích hợp khi bạn muốn hệ thống **tự động suy luận ngầm và bỏ qua câu hỏi** (silent inference) nếu điều kiện tiên quyết đã đủ để đưa ra giá trị mặc định, giúp tối giản hóa tối đa số lượng câu hỏi xuất hiện trên màn hình.
+
+* 9. Giải Quyết Xung Đột Luật (Conflict Resolution)
+
+Khi thiết kế bộ luật lâm sàng phức tạp, có khả năng hai luật khác nhau cùng đưa ra kết luận cho một biến mục tiêu (ví dụ: cả hai luật cùng kết luận về ~:ket_luan~ nhưng giá trị khác nhau).
+Để giải quyết vấn đề này:
+1. *Độ ưu tiên của luật (~:priority~)*:
+   - Mỗi luật trong danh sách ~:rules~ có thể khai báo một thuộc tính độ ưu tiên tùy chọn (ví dụ: ~:priority 10~).
+   - Khi chạy O'Doyle Rules, luật có độ ưu tiên cao hơn sẽ ghi đè (override) kết quả của luật có độ ưu tiên thấp hơn.
+2. *Thứ tự khai báo (Declaration Order)*:
+   - Nếu không khai báo ~:priority~, luật nào viết sau (dưới cùng của file EDN) sẽ được ưu tiên kích hoạt sau và ghi đè giá trị của luật viết trước trong cùng một phiên suy diễn.
+3. *Cảnh báo thiết kế (Static Validation)*:
+   - Khi biên dịch file EDN, hệ thống sẽ thực hiện phân tích tĩnh (static analysis) để phát hiện các luật có cùng điều kiện vế trái (LHS) nhưng lại đưa ra kết luận mâu thuẫn ở vế phải (RHS) và đưa ra cảnh báo cho lập trình viên.
+
+* 10. Kế Hoạch Triển Khai Chi Tiết (Implementation Roadmap)
+
+Khi bắt đầu triển khai code trong tương lai, chúng ta sẽ thực hiện theo các bước sau:
+1. *Tạo namespace mới*:
+   - Viết file ~src/com/drbinhthanh/bb_form/expert.clj~ để chứa toàn bộ logic của Expert System.
+   - Thêm thư viện ~odoyle-rules~ vào file cấu hình phụ thuộc (~bb.edn~ hoặc ~deps.edn~).
+2. *Xây dựng bộ biên dịch Luật (Rules Compiler)*:
+   - Hàm ~(compile-rules rules-edn)~ sẽ duyệt danh sách luật EDN và chuyển thành cấu trúc macro ~(o/ruleset ...)~ của O'Doyle.
+3. *Xây dựng Solver động*:
+   - Hàm ~(find-next-question form-schema current-answers goals)~ thực hiện thuật toán phân tích phụ thuộc ngược và trả về ID của câu hỏi tiếp theo kèm theo danh sách các câu hỏi ứng viên.
+4. *Tích hợp vào CLI & Runner*:
+   - Thêm flag ~--expert~ vào hàm ~parse-options~ trong ~bb_form.clj~.
+   - Khi chạy chế độ ~--expert~, thay thế hàm điều hướng tuần tự ~run-terminal-form~ bằng một loop giải chuyên gia mới tương thích với giao diện TUI/Gum.
+5. *Kiểm thử (Verification)*:
+   - Viết các test suite giả lập các kịch bản lâm sàng khác nhau (ví dụ: ngôi ngang, ngôi đầu chuyển dạ nhanh, ngôi đầu vỡ ối lâu giờ) và kiểm chứng số lượng câu hỏi thực tế được hỏi có đúng là tối giản và chính xác hay không.
+
+* 11. Cơ Chế Mở Rộng: Gọi Hàm Tự Định Nghĩa Ngoài (Custom Logic & External Functions)
+
+Việc viết rule trong file EDN thường bị hạn chế bởi bộ toán tử đóng sẵn có (như ~:and~, ~:or~, ~:=~, v.v.). Để hỗ trợ các logic khám chữa bệnh / tính toán chỉ số lâm sàng cực kỳ phức tạp (ví dụ: chấm điểm rủi ro tim mạch, tính biểu đồ chuyển dạ), =bb-form= hỗ trợ cơ chế nạp hàm Clojure từ file ngoài và sử dụng trực tiếp tại vế trái (LHS) lẫn vế phải (RHS) của Rule.
+
+** 11.1. Khai báo liên kết (Import & Alias)
+Tận dụng cơ chế ~:import~ hiện có của biểu mẫu EDN để nạp thư viện Clojure bên ngoài:
+#+BEGIN_SRC clojure
+;; Trong file sanh_expert.edn
+{:import [["./formulas/sanh_utils.clj" :as :sanh]]
+ ...}
+#+END_SRC
+
+** 11.2. Sử dụng hàm Clojure trong LHS của Rule
+Người dùng có thể viết hàm tự định nghĩa trong LHS bằng cách dùng tên hàm đi kèm namespace alias:
+#+BEGIN_SRC clojure
+;; Định nghĩa rule gọi hàm phức tạp ở điều kiện :if
+{:id :rule-nguy-co-cao
+ :if [:sanh/kiem-tra-nguy-co-cao :ngoi_thai :can_nang_thai :khung_chau]
+ :then {:ket_luan "Chỉ định mổ chủ động"}}
+#+END_SRC
+*Lưu ý*: Cú pháp trên tương đương với việc gọi hàm ~kiem-tra-nguy-co-cao~ truyền vào 3 tham số tương ứng với các giá trị của fields.
+
+** 11.3. Cơ chế Phân Tích Phụ Thuộc Tự Động (Auto Dependency Extraction)
+Làm thế nào để hệ thống Solver biết được hàm ngoài cần những câu hỏi nào của người dùng để trả lời trước (phục vụ cho giải thuật tối giản câu hỏi)?
+1. Bộ phân tích cú pháp (Parser) của Solver sẽ duyệt đệ quy (recursive scan) qua vế trái ~:if~ của Rule.
+2. Nó lọc ra các token là *keywords không có namespace* (ví dụ: ~:ngoi_thai~, ~:can_nang_thai~, ~:khung_chau~).
+3. Nếu các keywords này trùng khớp với ID của các trường trong ~:fields~, Solver sẽ tự động xem chúng là các **biến phụ thuộc (dependencies)** bắt buộc phải có giá trị trước khi hàm có thể được gọi.
+4. Bằng cách này, người dùng không cần phải khai báo thủ công danh sách phụ thuộc. Solver sẽ tự động quyết định hỏi ~:ngoi_thai~, ~:can_nang_thai~, và ~:khung_chau~ trước khi chạy đánh giá điều kiện luật ~:rule-nguy-co-cao~.
+
+** 11.4. Cách thức Biên dịch sang O'Doyle Rules
+Khi biên dịch luật trên ra O'Doyle Rules, bộ biên dịch thực hiện:
+1. Ánh xạ các biến phụ thuộc thành các dòng ràng buộc dữ liệu trong mệnh đề ~:what~.
+2. Thay thế namespace alias bằng namespace thật đã được giải quyết từ thuộc tính ~:import~.
+3. Sinh mã Clojure gọi hàm thật ở mệnh đề ~:when~:
+
+#+BEGIN_SRC clojure
+;; Mã Clojure/O'Doyle Rules được tự động sinh ra:
+(o/ruleset
+  {::rule-nguy-co-cao
+   [:what
+    [::session :ngoi_thai ngoi_thai]
+    [::session :can_nang_thai can_nang_thai]
+    [::session :khung_chau khung_chau]
+    :when
+    ;; Gọi hàm thật từ namespace đã được nạp
+    (com.drbinhthanh.sanh-utils/kiem-tra-nguy-co-cao ngoi_thai can_nang_thai khung_chau)
+    :then
+    (o/insert! ::session :ket_luan "Chỉ định mổ chủ động")]})
+#+END_SRC
+
+Cơ chế này mang lại khả năng mở rộng vô hạn: người dùng phổ thông có thể viết các luật so sánh đơn giản, còn lập trình viên có thể viết các module phân tích lâm sàng chuyên nghiệp bằng code Clojure/Babashka thuần túy ở các file bên ngoài mà không làm phức tạp hóa cú pháp EDN của biểu mẫu.
+
+* 12. Làm Rõ Cơ Chế Tự Động Hiển Thị Câu Hỏi (How Questions Are Automatically Triggered)
+
+Để giải đáp thắc mắc lớn nhất: **"Làm sao hệ thống biết câu hỏi nào được hiển thị mà không cần từ khóa chỉ định ẩn/hiện?"**
+
+Câu trả lời là: **Hệ thống tự động suy diễn hoàn toàn dựa trên vế trái (LHS) của tập luật và mục tiêu (Goals). Người dùng KHÔNG cần viết bất kỳ thuộc tính điều khiển giao diện nào như `show-if`.**
+
+Dưới đây là phân tích chi tiết cách thức hoạt động của cơ chế này qua một ví dụ cụ thể.
+
+** 12.1. Phân tích Luồng Suy Diễn Tự Động (Trình Tự Từng Bước)
+Hãy lấy lại ví dụ trong luật tính số giờ vỡ ối:
+#+BEGIN_SRC clojure
+;; Luật tính số giờ vỡ ối
+{:id :rule-tinh-gio-vo-oi
+ :if [:and [:= :nuoc_oi "Đã vỡ"]
+           [:exists :gio_vo_oi]]
+ :then {:so_gio_vo_oi [:call :sanh/tinh-gio-vo-oi :gio_vo_oi]}}
+
+;; Biến mục tiêu cuối cùng của cả form
+:goals [:ket_luan]
+#+END_SRC
+
+Giả sử có một luật khác cần dùng đến biến ~:so_gio_vo_oi~ để đưa ra kết luận cuối cùng (~:ket_luan~):
+#+BEGIN_SRC clojure
+;; Luật đưa ra kết luận dựa vào số giờ vỡ ối
+{:id :rule-ket-luan-vo-oi-lau
+ :if [:> :so_gio_vo_oi 12]
+ :then {:ket_luan "Mổ vì vỡ ối lâu > 12 tiếng"}}
+#+END_SRC
+
+Khi khởi chạy, Solver của =bb-form= sẽ thực hiện phân tích ngược từ mục tiêu ~:ket_luan~:
+1. Để biết ~:ket_luan~, nó tìm thấy luật ~:rule-ket-luan-vo-oi-lau~.
+2. Luật này cần biết giá trị của biến ~:so_gio_vo_oi~.
+3. ~:so_gio_vo_oi~ chưa có trong câu trả lời (và là một biến ẩn), nên hệ thống tìm luật sinh ra nó. Đó là luật ~:rule-tinh-gio-vo-oi~.
+4. Luật ~:rule-tinh-gio-vo-oi~ cần vế trái thỏa mãn: ~[:= :nuoc_oi "Đã vỡ"]~ và ~[:exists :gio_vo_oi]~.
+5. Cả ~:nuoc_oi~ và ~:gio_vo_oi~ đều là các câu hỏi thực tế trong mảng ~:fields~ (chưa có câu trả lời). Chúng được đưa vào tập hợp **Câu hỏi tiềm năng**.
+6. Solver chọn câu hỏi có độ ưu tiên cao hơn (~:priority~) hoặc xuất hiện trước để hỏi. Trong ví dụ này là ~:nuoc_oi~ (priority 60 > 40 của ~:gio_vo_oi~).
+
+** 12.2. Hai kịch bản ẩn hiện xảy ra tại runtime
+Khi câu hỏi ~:nuoc_oi~ được hiển thị, hành vi ẩn/hiện của các câu hỏi tiếp theo sẽ tự động được quyết định dựa trên câu trả lời của người dùng:
+
+- **Kịch bản 1: Người dùng trả lời là "Còn"**
+  - Fact ~[::session :nuoc_oi "Còn"]~ được nạp vào O'Doyle Rules.
+  - O'Doyle Rules chạy suy diễn. Lúc này, điều kiện ~[:= :nuoc_oi "Đã vỡ"]~ của luật ~:rule-tinh-gio-vo-oi~ lập tức bị **SAI (Falsified)**.
+  - Vì đây là điều kiện ~[:and ...]~, khi một nhánh bị sai thì cả biểu thức ~:if~ của luật này chắc chắn sẽ không bao giờ có thể đúng được nữa (đoản mạch logic).
+  - Khi luật ~:rule-tinh-gio-vo-oi~ không bao giờ có thể đúng, biến ~:so_gio_vo_oi~ cũng không thể được sinh ra từ luật này nữa.
+  - Solver cập nhật lại cây phụ thuộc và nhận thấy: Việc hỏi ~:gio_vo_oi~ lúc này là **vô nghĩa** vì nó không còn phục vụ cho việc tính toán bất kỳ luật nào dẫn tới mục tiêu nữa.
+  - Kết quả: **Câu hỏi ~:gio_vo_oi~ tự động bị ẩn đi** (hệ thống không bao giờ hỏi đến nó).
+
+- **Kịch bản 2: Người dùng trả lời là "Đã vỡ"**
+  - Fact ~[::session :nuoc_oi "Đã vỡ"]~ được nạp vào O'Doyle Rules.
+  - Nhánh điều kiện đầu tiên của luật ~:rule-tinh-gio-vo-oi~ đã **ĐÚNG (Satisfied)**.
+  - Tuy nhiên, toàn bộ biểu thức ~:if~ vẫn chưa được thỏa mãn hoàn toàn vì còn vế ~[:exists :gio_vo_oi]~ chưa xác định.
+  - Luật này vẫn còn cơ hội kích hoạt và sinh ra ~:so_gio_vo_oi~ (để từ đó dẫn tới mục tiêu ~:ket_luan~).
+  - Solver nhận thấy cần phải có giá trị ~:gio_vo_oi~ để giải quyết tiếp luật này.
+  - Kết quả: **Câu hỏi ~:gio_vo_oi~ tự động xuất hiện** cho người dùng nhập liệu.
+
+** 12.3. Lợi ích vượt trội so với cách viết cũ
+- **Không cần chỉ định cấu trúc giao diện**: Người dùng chỉ cần khai báo mối quan hệ thực tế giữa các dữ liệu lâm sàng ("nếu nước ối vỡ và có giờ vỡ thì tính được số giờ", "nếu số giờ vỡ > 12 thì chỉ định mổ"). Trình duyệt/CLI của `bb-form` sẽ tự tính toán ra màn hình hỏi nào cần xuất hiện.
+- **Tính tối giản tối đa**: Solver luôn tìm con đường ngắn nhất (hỏi ít nhất) để đạt được mục tiêu kết luận, tự động cắt bỏ (pruning) tất cả các nhánh câu hỏi không liên quan khi các điều kiện tiên quyết của chúng bị phủ định.
+- **Tự động tối ưu hóa**: Khi cấu trúc luật thay đổi (ví dụ: thêm một luật mới cần dùng chung một câu hỏi), lập trình viên không cần viết lại logic ẩn/hiện ở từng trường, hệ chuyên gia sẽ tự động phân tích lại cây phụ thuộc và quyết định thời điểm xuất hiện phù hợp nhất cho câu hỏi đó.

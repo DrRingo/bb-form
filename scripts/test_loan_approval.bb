@@ -31,44 +31,43 @@
    :thong_bao_tu_choi "OK"
    })
 
-(with-redefs [com.drbinhthanh.bb-form/clear-screen (fn [])
-              com.drbinhthanh.bb-form/render-header (fn [_])
-              babashka.process/shell (fn [& args] {:out ""})
-              clojure.core/println (fn [& args]
-                                     (let [msg (apply str args)]
-                                       (if (str/starts-with? msg "\nℹ️")
-                                         (swap! prints conj msg)
-                                         (do))))
-              com.drbinhthanh.bb-form/ask-field (fn [field form]
-                                                  (if (= (:type field) :hidden)
-                                                    nil
-                                                    (let [id (:id field)]
-                                                      (swap! ask-order conj id)
-                                                      (swap! com.drbinhthanh.bb-form/answers assoc-in [:selectedByUser (keyword id)] (get mock-inputs (keyword id) "N/A")))))]
-  
-  (com.drbinhthanh.bb-form/-main "forms/loan_approval.edn" "--out" "result_loan.edn"))
+;; Tạo mock-ui-adapter
+(def mock-ui-adapter
+  {:clear-screen  (fn [])
+   :render-header (fn [_ _])
+   :show-error    (fn [_])
+   :ask-field     (fn [field form answers-atom]
+                    (if (= (:type field) :hidden)
+                      nil
+                      (let [id (:id field)]
+                        (swap! ask-order conj (keyword id))
+                        (swap! answers-atom assoc-in [:selectedByUser (keyword id)] (get mock-inputs (keyword id) "N/A")))))
+   :pause         (fn [_])})
 
-(clojure.core/println "\n--- THỨ TỰ CÂU HỎI ---")
-(clojure.core/println @ask-order)
+(reset! com.drbinhthanh.bb-form.core/answers {:selectedByUser {} :HiddenVar (get form :variables {})})
+(com.drbinhthanh.bb-form.core/run-terminal-form form com.drbinhthanh.bb-form.core/answers mock-ui-adapter)
 
-(def res (edn/read-string (slurp "result_loan.edn")))
-(clojure.core/println "\n--- TRẠNG THÁI CUỐI CÙNG ---")
-(clojure.core/println (:HiddenVar res))
+(println "\n--- THỨ TỰ CÂU HỎI ---")
+(println @ask-order)
+
+(def res @com.drbinhthanh.bb-form.core/answers)
+(println "\n--- TRẠNG THÁI CUỐI CÙNG ---")
+(println (:HiddenVar res))
 
 ;; Kiểm tra xem các câu backward có xuất hiện ĐÚNG SAU câu trigger hay không
 (let [pass? (and (= @ask-order [:ho_ten :ngay_sinh :thu_nhap_thang :lich_su_no_xau 
-                                :giai_trinh_rui_ro ; Xuất hiện ngay sau lich_su_no_xau (vòng 2 của stage 1)
                                 :loai_hinh_cong_viec
+                                :giai_trinh_rui_ro ; Xuất hiện ở vòng 2 của stage 1
                                 :so_tien_muon_vay :danh_sach_tai_san
-                                :thong_tin_nguoi_dong_so_huu ; Xuất hiện sau danh_sach_tai_san
+                                :thong_tin_nguoi_dong_so_huu ; Xuất hiện ở vòng 2 của stage 2
                                 :thong_bao_tu_choi])
                  (= (:loan_status (:HiddenVar res)) "Bị Từ Chối")
                  (= (:global_credit_score (:HiddenVar res)) 70)
                  (= (:global_total_assets (:HiddenVar res)) 1000000000))]
   (if pass?
     (do
-      (clojure.core/println "\n✅ KIỂM THỬ THÀNH CÔNG: Vòng lặp Backward và Hidden Variables (Local/Global) hoạt động hoàn hảo!")
+      (println "\n✅ KIỂM THỬ THÀNH CÔNG: Vòng lặp Backward và Hidden Variables (Local/Global) hoạt động hoàn hảo!")
       (System/exit 0))
     (do
-      (clojure.core/println "\n❌ KIỂM THỬ THẤT BẠI!")
+      (println "\n❌ KIỂM THỬ THẤT BẠI!")
       (System/exit 1))))

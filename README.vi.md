@@ -10,11 +10,11 @@ Công cụ CLI dùng Babashka + Charm Gum để thu thập dữ liệu từ các
 
 | Tính năng | Mô tả |
 |---|---|
-| 🧠 **EDN Logic Engine** | Flat-list fields với bộ thông dịch `eval-expr` (`and/or/not/=/>/<`) |
+| 🧠 **Hệ chuyên gia** | Chạy với luật O'Doyle RETE suy diễn tiến & bộ giải ngược khi khai báo `:format :expert` trong tệp EDN |
 | 🔀 **`:show-if` động** | Hiện/ẩn câu hỏi theo trạng thái runtime |
 | 🗄️ **Biến ẩn** | Khai báo `:variables` để theo dõi trạng thái nền |
 | ⚡ **Hiệu ứng phụ** | `:actions` để thay đổi state sau mỗi câu trả lời |
-| 📦 **Import công thức** | Import thư viện `.edn` hoặc `.clj` với alias namespace |
+| 📦 **Import công thức** | Import thư viện `.edn` hoặc `.clj` với alias namespace hoặc gọi rút gọn `[:alias/fn arg ...]` |
 | 🔣 **Toán tử `[:call]`** | Gọi bất kỳ hàm nào từ thư viện đã import |
 | 🔍 **Toán tử `[:get]`** | Trích xuất thuộc tính từ map kết quả phức tạp |
 | 🎲 **Hỗ trợ xác suất** | Tích hợp mô hình Bayesian Stan qua Clojure bridge |
@@ -84,6 +84,9 @@ bb-form forms/job_application.edn
 
 # Sử dụng engine JLine3 TUI Clojure gốc
 bb-form forms/job_application.edn --engine tui
+
+# Chạy một form tự động hoạt động ở chế độ hệ chuyên gia dựa trên cấu hình :format EDN
+bb-form forms/sanh-expert.edn
 
 # Chạy batch tự động
 bb-form forms/job_application.edn --values forms/values.edn --out result.edn
@@ -234,6 +237,14 @@ bb-form/
 ---
 
 ## 🗓️ Lịch Sử Phiên Bản
+
+### v2.3.0
+- ✅ **Chế độ Hệ Chuyên Gia (`:format :expert` hoặc `:format "expert"`)**:
+  - Tích hợp động cơ luật suy diễn tiến RETE (`net.sekao/odoyle-rules`) và bộ giải ngược (`resolve-var`) để hỏi người dùng số lượng câu hỏi tối thiểu cần thiết để đạt mục tiêu `:goals`.
+  - Hỗ trợ thứ tự ưu tiên của luật (`:priority`) giải quyết xung đột khi nhiều luật ghi đè kết quả cho cùng một thuộc tính.
+  - Tự động phát hiện biến phụ thuộc từ công thức điều kiện `:if` và kết quả `:then`, làm các kiểm tra `:exists :var` thủ công trở thành không bắt buộc.
+  - Hỗ trợ khối `:require [list of vars]` để khai báo thủ công các biến phụ thuộc trực tiếp ở cấp độ luật.
+  - Hỗ trợ gọi tắt hàm namespace (ví dụ: `[:ns/fn args...]` thay vì `[:call :ns/fn args...]`).
 
 ### v2.2.0
 - ✅ **Hỗ trợ Web Engine Forms.md (`--engine formsmd`)**:

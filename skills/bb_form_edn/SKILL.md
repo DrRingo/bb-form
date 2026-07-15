@@ -19,6 +19,7 @@ Mỗi biểu mẫu EDN là một bản đồ (map) Clojure. Dưới đây là kh
 {;; === THÔNG TIN CHUNG ===
  :title             "Tiêu đề của Biểu Mẫu"
  :description       "Mô tả chi tiết về mục đích hoặc hướng dẫn của biểu mẫu này."
+ :format            :normal                       ; Định dạng chạy form: :normal (rẽ nhánh thông thường) hoặc :expert (hệ chuyên gia)
  :id                "survey-id-unique"           ; Định danh cho formsmd (tùy chọn)
  :submit-button-text "Hoàn thành & Gửi"           ; Nhãn nút gửi trên web formsmd (tùy chọn)
  :restart-button    "show"                        ; Hiển thị nút làm lại trên web: "show" | "hide"
@@ -59,6 +60,7 @@ Mỗi biểu mẫu EDN là một bản đồ (map) Clojure. Dưới đây là kh
 ### 2.1. Nhóm Khai Báo metadata
 - **`:title`** (Kiểu: `String` - Bắt buộc): Tiêu đề của biểu mẫu được in đậm nổi bật ở phần header.
 - **`:description`** (Kiểu: `String` - Tùy chọn): Mô tả hoặc lời chào giới thiệu nằm ngay dưới tiêu đề.
+- **`:format`** (Kiểu: `Keyword` - Tùy chọn): Khai báo định dạng của form. Nhận giá trị `:expert` để tự động kích hoạt chế độ **Hệ chuyên gia (Expert System)** với bộ giải ngược và RETE rules. Nếu không khai báo hoặc nhận `:normal` (mặc định), hệ thống sẽ chạy ở chế độ câu hỏi rẽ nhánh thông thường.
 - **`:id`** (Kiểu: `String` - Tùy chọn): Định danh của form. Được dùng làm thuộc tính `#! id` khi biên dịch sang Forms.md.
 - **`:submit-button-text`** (Kiểu: `String` - Tùy chọn): Nhãn của nút bấm gửi kết quả ở slide cuối cùng của Forms.md.
 - **`:restart-button`** (Kiểu: `String` - Tùy chọn): Nhận giá trị `"show"` hoặc `"hide"`. Quyết định xem Forms.md có hiện nút "Restart" để điền lại hay không.
@@ -497,7 +499,47 @@ Khi người dùng cuộn đến và trả lời câu cuối, Engine sẽ phát 
 
 ---
 
-## 10. Hướng Dẫn Tác Nhân AI (AI Coding Guidelines)
+## 10. Chế Độ Marathon, Giải Quyết Xung Đột & Cơ Chế Giá Trị Mặc Định
+
+Để tự động hóa việc điền và xuất dữ liệu mà không cần sự tương tác trực tiếp của người dùng (chế độ headless/marathon), `bb-form` tích hợp một cơ chế tìm kiếm đường đi (Pathfinder Solver) và xử lý giá trị mặc định cực kỳ mạnh mẽ.
+
+### 10.1. Chế Độ Marathon (`--marathon`) là gì?
+- **Khái niệm**: Là chế độ chạy tự động không tương tác. Hệ thống sẽ tự động điền các câu hỏi dựa trên các giá trị đã được cung cấp trước (`prefilled` qua CLI hoặc file `values`) và tự động áp dụng các giá trị mặc định (`:default`) cho các câu hỏi còn lại để đi tới đích cuối cùng.
+- **Phân biệt với Chế độ Tương tác**:
+  - Ở chế độ tương tác (TUI, Gum, Web Forms.md), thuộc tính `:default` trong file form EDN **hoàn toàn bị bỏ qua khi điền tự động**. Hệ thống bắt buộc phải hiển thị câu hỏi và chờ đợi người dùng nhập, trừ khi trường đó đã được khai báo cụ thể trong dữ liệu nhập (`values`).
+  - Ở chế độ marathon, `:default` được dùng tích cực để tự điền và đi tiếp mà không dừng lại hỏi.
+
+### 10.2. Phân Rã Dữ Liệu Nhập & Giải Quyết Xung Đột (Conflict Resolution)
+Khi người dùng truyền vào một tập các giá trị trả trước (`prefilled` values) từ dòng lệnh hoặc từ file values:
+1. **Chuẩn hóa kiểu dữ liệu (Parsing & Casting)**:
+   - Các giá trị đầu vào ban đầu ở dạng chuỗi (String) sẽ được tự động phân tích và chuyển đổi thành đúng kiểu dữ liệu khai báo trong form EDN (ví dụ: chuyển `"18"` thành số `18` cho trường `:number`, hoặc `"Nam"` thành chuỗi tương ứng).
+2. **Xác định Thứ tự Ưu tiên (Priority-based Sorting)**:
+   - Các trường nhập được sắp xếp theo độ ưu tiên giảm dần dựa trên thuộc tính `:priority` được cấu hình trong mỗi trường (mặc định `:priority` là `0`). Các trường có độ ưu tiên cao hơn sẽ được giải quyết trước.
+3. **Tìm Đường Đi và Giải Quyết Xung Đột (Pathfinder Backtracking)**:
+   - Bộ giải đường đi (`solve-stages`) thực hiện duyệt đệ quy (backtracking search) qua các stage để tìm ra một tập hợp các giá trị đồng nhất thỏa mãn toàn bộ luật điều kiện logic (`:show-if`).
+   - **Xử lý Xung đột**: Nếu người dùng cung cấp các giá trị mâu thuẫn nhau (ví dụ: khai báo `:ngoi_thai "Ngang"` nhưng lại cung cấp `:do_xoa_ctc "60%"` trong khi `:do_xoa_ctc` chỉ hiển thị khi ngôi thai là `"Đầu"` hoặc `"Mông"`), hệ thống sẽ:
+     - Giữ lại giá trị của trường có độ ưu tiên cao hơn.
+     - Loại bỏ (discard) các giá trị có độ ưu tiên thấp hơn gây xung đột ra khỏi tập câu trả lời được chấp nhận cuối cùng (`final-accepted`).
+     - Trả về danh sách câu trả lời sạch, không xung đột để đảm bảo chương trình không bị crash và luôn chạy trên một đường đi logic hợp lệ.
+
+### 10.3. Cách Thức Hoạt Động Của Giá Trị Mặc Định (`:default`)
+Khi chạy ở chế độ Marathon, nếu một trường câu hỏi chưa có câu trả lời từ người dùng, hệ thống sẽ lấy giá trị mặc định theo thứ tự ưu tiên sau:
+1. **Giá trị cấu hình tĩnh**: Lấy trực tiếp từ khóa `:default` khai báo trong trường (ví dụ: `:default "Đầu"`).
+2. **Công thức tính toán động**: Nếu `:default` là một biểu thức logic EDN (ví dụ: `:default [:if [:= [:var :a] 1] "Đúng" "Sai"]`), hệ thống sẽ truyền ngữ cảnh câu trả lời hiện tại (`answers-atom`) vào để tính toán ra giá trị thực tế tại thời điểm đó.
+
+### 10.4. Cơ Chế Lấy Giá Trị Tối Thiểu Thỏa Mãn (Fallback to Minimum Satisfying Value)
+Nếu biểu mẫu được chạy ở chế độ Marathon nhưng trường đó **không được cấu hình thuộc tính `:default`**, để tránh việc luồng chạy bị tắc nghẽn, `bb-form` sẽ kích hoạt cơ chế fallback tự động sinh ra **giá trị nhỏ nhất/tối thiểu thỏa mãn** dựa trên kiểu dữ liệu của trường:
+- **`:number`**: Nếu trường cấu hình giới hạn dưới `:min`, hệ thống lấy đúng giá trị `:min`. Nếu không có `:min`, mặc định trả về số `0`.
+- **`:text`**: Trả về một chuỗi rỗng `""`.
+- **`:date`**: Trả về ngày hiện tại lúc `00:00` (định dạng `YYYY-MM-DD 00:00`).
+- **`:datetime`**: Trả về ngày và giờ hiện tại (định dạng `YYYY-MM-DD HH:mm`).
+- **`:select` / `:radio`**: Lấy lựa chọn đầu tiên xuất hiện trong danh sách `:options`.
+- **`:multiselect`**: Trả về một mảng rỗng `[]`.
+- **`:info`**: Giải quyết nhãn động và trả về nội dung text tương ứng.
+
+---
+
+## 11. Hướng Dẫn Tác Nhân AI (AI Coding Guidelines)
 
 Khi nhận yêu cầu viết, nâng cấp hoặc gỡ lỗi file form EDN, các tác nhân AI cần tuân thủ nghiêm ngặt các quy tắc sau:
 

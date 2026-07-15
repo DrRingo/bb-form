@@ -2,7 +2,8 @@
 ;; do người dùng truyền sẵn --values thoả mãn điều kiện hiển thị của nó.
 ;; Chạy: bb scripts/test_prefilled_backward.bb
 
-(require '[clojure.edn :as edn])
+(require '[clojure.edn :as edn]
+         '[clojure.string :as str])
 (load-file "src/com/drbinhthanh/bb_form.clj")
 
 (def form (edn/read-string (slurp "forms/hr_survey.edn")))
@@ -20,18 +21,24 @@
    :ngay_vao_lam "01-01-2024"
    :muc_do_hai_long "Hài lòng"})
 
-(with-redefs [com.drbinhthanh.bb-form/clear-screen (fn [])
-              com.drbinhthanh.bb-form/render-header (fn [_])
-              com.drbinhthanh.bb-form/ask-field (fn [field form]
-                                                  (let [id (:id field)]
-                                                    (swap! ask-order conj id)
-                                                    (swap! com.drbinhthanh.bb-form/answers assoc-in [:selectedByUser (keyword id)] (get mock-inputs (keyword id) "N/A"))))]
-  
-  ;; Giả lập người dùng nhập tham số qua CLI: --values '{:ngon_ngu_chinh "Clojure"}'
-  (reset! com.drbinhthanh.bb-form/answers {:selectedByUser {:ngon_ngu_chinh "Clojure"}})
-  
-  (println "Đang chạy form Khảo Sát Nhân Sự với prefilled {:ngon_ngu_chinh \"Clojure\"}...")
-  (com.drbinhthanh.bb-form/run-form form))
+;; Tạo mock-ui-adapter
+(def mock-ui-adapter
+  {:clear-screen  (fn [])
+   :render-header (fn [_ _])
+   :show-error    (fn [_])
+   :ask-field     (fn [field form answers-atom]
+                    (if (= (:type field) :hidden)
+                      nil
+                      (let [id (:id field)]
+                        (swap! ask-order conj (keyword id))
+                        (swap! answers-atom assoc-in [:selectedByUser (keyword id)] (get mock-inputs (keyword id) "N/A")))))
+   :pause         (fn [_])})
+
+;; Giả lập người dùng nhập tham số qua CLI: --values '{:ngon_ngu_chinh "Clojure"}'
+(reset! com.drbinhthanh.bb-form.core/answers {:selectedByUser {:ngon_ngu_chinh "Clojure"} :HiddenVar (get form :variables {})})
+
+(println "Đang chạy form Khảo Sát Nhân Sự với prefilled {:ngon_ngu_chinh \"Clojure\"}...")
+(com.drbinhthanh.bb-form.core/run-terminal-form form com.drbinhthanh.bb-form.core/answers mock-ui-adapter)
 
 (println "\nThứ tự các câu hỏi được hiển thị thực tế:" @ask-order)
 

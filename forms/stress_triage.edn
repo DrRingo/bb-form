@@ -1,0 +1,156 @@
+;; ═══════════════════════════════════════════════════════════════
+;; STRESS TEST 2: Emergency Triage NEWS2 System
+;; Mục tiêu kiểm tra:
+;;   ✅ Multiple Goals (:news2_score, :cap_cuu_ket_luan)
+;;   ✅ Cú pháp rút gọn [:ns/fn args] (Thiếu 5 đã fix) trong LHS rule
+;;   ✅ Phương án B: Rule gán default ngầm không hỏi người dùng
+;;   ✅ :exists trong LHS phức hợp với 6 biến đầu vào
+;;   ✅ :not [:exists ...] để kiểm tra trường chưa được điền
+;;   ✅ Rule tiền đề (intermediate) dẫn đến 2 goals song song
+;; ═══════════════════════════════════════════════════════════════
+
+{:format      :expert
+ :title       "Phân Loại Cấp Cứu NEWS2"
+ :description "Hệ thống đánh giá và phân loại mức độ cấp cứu theo thang điểm NEWS2."
+
+ :import [["../formulas/triage_utils.clj" :as :triage]]
+
+ :goals [:cap_cuu_ket_luan]
+
+ :fields
+ [;; === THÔNG TIN BỆNH NHÂN ===
+  {:id       :ten_benh_nhan
+   :label    "Tên bệnh nhân"
+   :type     :text
+   :required true
+   :priority 100}
+
+  {:id       :tuoi_benh_nhan
+   :label    "Tuổi bệnh nhân"
+   :type     :number
+   :required true
+   :priority 95}
+
+  {:id       :chan_doan_so_bo
+   :label    "Chẩn đoán sơ bộ của điều dưỡng"
+   :type     :text
+   :required false
+   :default  "Chưa xác định"
+   :priority 90}
+
+  ;; === 6 DẤU HIỆU SINH TỒN (NEWS2) ===
+  {:id       :nhip_tho
+   :label    "Nhịp thở (lần/phút)"
+   :type     :number
+   :required true
+   :priority 85}
+
+  {:id       :nhip_tim
+   :label    "Nhịp tim (lần/phút)"
+   :type     :number
+   :required true
+   :priority 80}
+
+  {:id       :huyet_ap_tam_thu
+   :label    "Huyết áp tâm thu (mmHg)"
+   :type     :number
+   :required true
+   :priority 75}
+
+  {:id       :do_bao_hoa_oxy
+   :label    "Độ bão hòa oxy SpO2 (%)"
+   :type     :number
+   :required true
+   :priority 70}
+
+  {:id       :nhiet_do
+   :label    "Nhiệt độ cơ thể (°C)"
+   :type     :number
+   :required true
+   :priority 65}
+
+  {:id       :y_thuc
+   :label    "Ý thức"
+   :type     :select
+   :required true
+   :options  ["Tỉnh táo" "Mơ hồ/Kích thích" "Lơ mơ" "Hôn mê"]
+   :priority 60}
+
+  ;; === THÔNG TIN BỔ SUNG (chỉ hỏi trong một số trường hợp) ===
+  {:id       :tien_su_hen_suyen
+   :label    "Bệnh nhân có tiền sử hen suyễn / COPD không?"
+   :type     :select
+   :required false
+   :options  ["Có" "Không"]
+   :priority 50}
+
+  {:id       :dang_dung_oxy
+   :label    "Bệnh nhân đang được hỗ trợ oxy không?"
+   :type     :select
+   :required false
+   :options  ["Có - FiO2 thấp" "Có - FiO2 cao" "Không"]
+   :priority 45}
+
+  ;; === KẾT QUẢ ===
+  {:id       :ket_qua_cuoi
+   :label    "╔══ KẾT QUẢ PHÂN LOẠI CẤP CỨU ══╗\n\n{{cap_cuu_ket_luan}}\n\nNguy cơ bổ sung:\n- Hen suyễn/COPD: {{tien_su_hen_suyen}}\n- Hỗ trợ oxy: {{dang_dung_oxy}}\n\n╚═════════════════════════════════╝"
+   :type     :info
+   :required true
+   :default  [:if [:exists :cap_cuu_ket_luan] "done" :not-answered]
+   :priority 5}
+ ]
+
+ :rules
+ [
+  ;; ─── PHƯƠNG ÁN B: Gán default ngầm cho chan_doan_so_bo nếu chưa điền ───
+  ;; Rule này tự kích hoạt và điền "Chưa xác định" mà không cần hỏi người dùng
+  {:id       :rule-default-chan-doan
+   :priority 5
+   :if       [:= :chan_doan_so_bo :not-answered]
+   :then     {:chan_doan_so_bo "Chưa xác định"}}
+
+  ;; ─── TẦNG 1: Tính điểm NEWS2 từ 6 dấu hiệu sinh tồn ───
+  ;; Dùng cú pháp RÚT GỌN [:triage/tinh-news2 ...] thay vì [:call :triage/tinh-news2 ...]
+  ;; ĐÂY LÀ STRESS TEST CHO THIẾU 5 (§11.2)
+  {:id       :rule-tinh-news2
+   :priority 10
+   :then     {:news2_score [:triage/tinh-news2      ;; <-- CÚ PHÁP RÚT GỌN §11.2
+                             :nhip_tho
+                             :nhip_tim
+                             :huyet_ap_tam_thu
+                             :do_bao_hoa_oxy
+                             :nhiet_do
+                             :y_thuc]}}
+
+  ;; ─── TẦNG 2: Phân loại màu từ điểm NEWS2 ───
+  {:id       :rule-phan-loai
+   :priority 10
+   :then     {:mau_cap_cuu [:call :triage/phan-loai-cap-cuu :news2_score]}}
+
+  ;; ─── TẦNG 3: Kết luận đầy đủ (GOAL 1) ───
+  {:id       :rule-ket-luan-cap-cuu
+   :priority 10
+   :then     {:cap_cuu_ket_luan [:call :triage/ket-luan-cap-cuu
+                                  :news2_score
+                                  :ten_benh_nhan
+                                  :tuoi_benh_nhan
+                                  :mau_cap_cuu
+                                  :chan_doan_so_bo]}}
+
+  ;; ─── CONFLICT: Bệnh nhân hôn mê/HA tụt/SpO2 thấp → LUÔN là ĐỎ, override tất cả ───
+  ;; priority 100 đảm bảo rule này là rule CUỐI CÙNG fire và ghi đè mọi kết luận trước đó
+  {:id       :rule-hon-me-do
+   :priority 100
+   :if       [:or [:= :y_thuc "Hôn mê"]
+                  [:< :huyet_ap_tam_thu 70]
+                  [:< :do_bao_hoa_oxy 85]]
+   :then     {:cap_cuu_ket_luan "🔴 ĐỎ - NGUY HIỂM TÍNH MẠNG\n→ kích hoạt hồi sức tim phổi ngay. Gọi code blue. Kích hoạt phòng mổ khẩn cấp."}}
+
+  ;; ─── CONFLICT: Hen suyễn cộng SpO2 thấp → cần oxy ngay (priority 60, thua hôn mê) ───
+  {:id       :rule-hen-spo2
+   :priority 60
+   :if       [:and [:= :tien_su_hen_suyen "Có"]
+                  [:< :do_bao_hoa_oxy 92]]
+   :then     {:cap_cuu_ket_luan "🟠 CAM - HEN CẤP NẶNG\n→ Nebulizer salbutamol ngay. Oxy mask 8L/phút. Gọi bác sĩ trong 5 phút."}}
+ ]
+}

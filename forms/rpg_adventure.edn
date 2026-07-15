@@ -1,69 +1,132 @@
-;; Form RPG Adventure — Bằng chứng về khả năng rẽ nhánh siêu phức tạp bằng EDN
-;; Dùng Flat List + EDN Expressions thay thế hoàn toàn cấu trúc cây cũ
+;; Biểu mẫu Trò Chơi Thám Tử - Tích hợp Hệ chuyên gia (Expert System)
+;; Hệ luật sẽ tự động tính toán điểm số và đưa ra kết luận đánh giá dựa trên các lựa chọn.
 
-{:title       "Vụ Án Mất Tích"
- :description "Bạn là thám tử. Mọi lựa chọn đều dẫn đến những câu hỏi khác nhau."
+{:format      :expert
+ :title       "Vụ Án Mạng Tại Biệt Thự Sương Mù"
+ :description "Bạn là thám tử tư. Mọi quyết định thu thập manh mối của bạn sẽ trực tiếp ảnh hưởng đến kết luận và điểm số phá án cuối cùng."
+ 
+ :import [["../formulas/rpg_utils.clj" :as :rpg]]
+ 
+ :goals [:ket_qua_cuoi_cung]
+ 
  :fields
- [{:id       :ten_tham_tu
+ [
+  ;; ─────────────────────────────────────────────────────────────────
+  ;; 1. THÔNG TIN THÁM TỬ & DỤNG CỤ
+  ;; ─────────────────────────────────────────────────────────────────
+  {:id       :ten_tham_tu
    :label    "Tên của bạn là gì, thám tử?"
    :type     :text
-   :required true}
+   :required true
+   :priority 100}
 
-  {:id       :do_nghe
-   :label    "Bạn mang theo dụng cụ gì khi tới hiện trường?"
+  {:id       :dung_cu
+   :label    "Bạn mang theo dụng cụ gì khi tới hiện trường? (Chọn nhiều phương án)"
    :type     :multiselect
-   :required false
-   :options  ["Kính lúp" "Đèn pin" "Súng" "Găng tay cao su"]}
+   :required true
+   :options  ["Kính lúp" "Đèn pin" "Bộ tăm bông lấy mẫu" "Sổ tay thám tử"]
+   :priority 95}
 
-  {:id       :hanh_dong_dau_tien
-   :label    "Cánh cửa căn nhà gỗ đang hé mở. Bạn làm gì?"
+  ;; ─────────────────────────────────────────────────────────────────
+  ;; 2. PHƯƠNG ÁN TIẾP CẬN HỆN TRƯỜNG
+  ;; ─────────────────────────────────────────────────────────────────
+  {:id       :tiep_can_hien_truong
+   :label    "Cảnh sát vừa phong tỏa biệt thự sương mù. Bạn muốn bắt đầu từ đâu?"
    :type     :select
    :required true
-   :options  ["Đạp cửa xông vào" "Gõ cửa cẩn thận" "Nhìn qua khe cửa"]}
+   :options  ["Khám nghiệm phòng ngủ trước"
+              "Khám nghiệm thư phòng trước"
+              "Phỏng vấn các nghi phạm ngay lập tức"]
+   :priority 90}
 
-  ;; -----------------------------------------
-  ;; Rẽ nhánh: Nếu Đạp Cửa
-  ;; -----------------------------------------
-  {:id       :rut_sung
-   :label    "Bên trong tối om, có tiếng động lạ! Bạn có rút súng không?"
+  ;; ─────────────────────────────────────────────────────────────────
+  ;; 3. CHI TIẾT TỪNG NHÁNH KHẢO SÁT
+  ;; ─────────────────────────────────────────────────────────────────
+  
+  ;; Nhánh A: Khám nghiệm phòng ngủ trước (Nơi có thi thể nạn nhân John Doe)
+  {:id       :kham_nghiem_tu_thi
+   :label    "Tại phòng ngủ, thi thể nạn nhân nằm trên giường. Bạn tập trung vào điểm nào?"
    :type     :select
    :required true
-   :options  ["Có" "Không"]
-   :show-if  [:and
-               [:= [:var :hanh_dong_dau_tien] "Đạp cửa xông vào"]
-               [:contains? [:var :do_nghe] "Súng"]]}
+   :options  ["Kiểm tra vết thương trên cổ"
+              "Kiểm tra ly rượu uống dở cạnh giường"
+              "Lấy mẫu chất dịch trên môi nạn nhân"]
+   :priority 80}
 
-  {:id       :bi_tan_cong
-   :label    "Bạn không có súng! Một bóng đen lao ra. Bạn làm gì?"
+  ;; Nhánh B: Khám nghiệm thư phòng trước (Nơi làm việc của nạn nhân)
+  {:id       :kiem_tra_thu_phong
+   :label    "Thư phòng rất ngăn nắp, nhưng có vẻ có điểm bất thường. Bạn kiểm tra:"
    :type     :select
    :required true
-   :options  ["Đỡ đòn" "Bỏ chạy"]
-   :show-if  [:and
-               [:= [:var :hanh_dong_dau_tien] "Đạp cửa xông vào"]
-               [:not [:contains? [:var :do_nghe] "Súng"]]]}
+   :options  ["Tìm trong ngăn kéo bàn làm việc"
+              "Kiểm tra lò sưởi có tàn tro giấy đốt"
+              "Kiểm tra bức tranh treo tường bị lệch"]
+   :priority 80}
 
-  ;; -----------------------------------------
-  ;; Rẽ nhánh: Nếu Nhìn qua khe cửa
-  ;; -----------------------------------------
-  {:id       :quan_sat_bang_kinh
-   :label    "Dùng kính lúp, bạn phát hiện một vết máu nhỏ trên nắm đấm cửa. Bạn:"
+  ;; Nhánh C: Phỏng vấn nghi phạm ngay lập tức
+  {:id       :phong_van_nghi_pham
+   :label    "Ba nghi phạm đang đợi ở phòng khách. Bạn muốn phỏng vấn ai trước?"
    :type     :select
    :required true
-   :options  ["Lấy mẫu máu" "Bỏ qua, đi tiếp"]
-   :show-if  [:and
-               [:= [:var :hanh_dong_dau_tien] "Nhìn qua khe cửa"]
-               [:contains? [:var :do_nghe] "Kính lúp"]]}
+   :options  ["Gặng hỏi Quản gia về mốc thời gian 10h tối"
+              "Hỏi Isabella về bức thư nợ tiền"
+              "Hỏi Bác sĩ Watson về vết xước trên tay"]
+   :priority 80}
 
-  ;; Câu hỏi kết luận phụ thuộc nhiều điều kiện phức tạp
-  {:id       :ket_luan
-   :label    "Tóm lại, bạn nghĩ thủ phạm là ai?"
+  ;; ─────────────────────────────────────────────────────────────────
+  ;; 4. KẾT LUẬN CUỐI CÙNG
+  ;; ─────────────────────────────────────────────────────────────────
+  {:id       :thu_pham
+   :label    "Sau khi tổng hợp các manh mối, ai là thủ phạm thực sự của vụ án?"
    :type     :select
    :required true
-   :options  ["Người hầu" "Quản gia" "Một con thú hoang" "Chưa đủ bằng chứng"]
-   ;; Hiện ra khi đã vượt qua các hành động đầu tiên và xử lý xong tình huống
-   :show-if  [:or
-               [:= [:var :bi_tan_cong] "Đỡ đòn"]
-               [:= [:var :rut_sung] "Có"]
-               [:= [:var :quan_sat_bang_kinh] "Lấy mẫu máu"]
-               [:= [:var :hanh_dong_dau_tien] "Gõ cửa cẩn thận"]]}
- ]}
+   :options  ["Quản gia Alfred"
+              "Isabella"
+              "Bác sĩ Watson"
+              "Cả Quản gia Alfred và Isabella đồng phạm"]
+   :priority 50}
+
+  ;; ─────────────────────────────────────────────────────────────────
+  ;; 5. KẾT QUẢ HIỂN THỊ
+  ;; ─────────────────────────────────────────────────────────────────
+  {:id       :ket_qua_cuoi_cung
+   :label    "\n=== KẾT QUẢ ĐIỀU TRA ===\nThám tử: {{ten_tham_tu}}\nDụng cụ mang theo: {{dung_cu}}\nNhánh tiếp cận: {{tiep_can_hien_truong}}\n\nĐIỂM PHÁ ÁN CỦA BẠN: {{diem_so}}/110\nĐÁNH GIÁ: {{ket_luan}}\n======================="
+   :type     :info
+   :required true
+   :default  [:if [:exists :ket_luan] "Xem xong" :not-answered]
+   :priority 10}
+ ]
+
+ :rules
+ [
+   ;; Luật 1: Xác định tiến trình điều tra tại hiện trường đã hoàn thành
+   ;; Sẽ tự động kích hoạt câu hỏi rẽ nhánh tương ứng dựa trên lựa chọn tiếp cận
+   {:id :rule-da-khao-sat-xong
+    :if [:or [:and [:= :tiep_can_hien_truong "Khám nghiệm phòng ngủ trước"]
+                   :kham_nghiem_tu_thi]
+             [:and [:= :tiep_can_hien_truong "Khám nghiệm thư phòng trước"]
+                   :kiem_tra_thu_phong]
+             [:and [:= :tiep_can_hien_truong "Phỏng vấn các nghi phạm ngay lập tức"]
+                   :phong_van_nghi_pham]]
+    :require [:ten_tham_tu :dung_cu]
+    :then {:khao_sat_hoan_tat true}}
+
+   ;; Luật 2: Khi đã có kết quả điều tra và lựa chọn thủ phạm, tính toán điểm số ẩn
+   {:id :rule-tinh-diem
+    :if [:and [:= :khao_sat_hoan_tat true]
+              :thu_pham]
+    :require [:khao_sat_hoan_tat :thu_pham :dung_cu :tiep_can_hien_truong]
+    :then {:diem_so [:rpg/tinh-diem
+                      :dung_cu
+                      :tiep_can_hien_truong
+                      [:if [:exists :kham_nghiem_tu_thi] :kham_nghiem_tu_thi "N/A"]
+                      [:if [:exists :kiem_tra_thu_phong] :kiem_tra_thu_phong "N/A"]
+                      [:if [:exists :phong_van_nghi_pham] :phong_van_nghi_pham "N/A"]
+                      :thu_pham]}}
+
+   ;; Luật 3: Từ điểm số đã tính toán, đưa ra kết luận xếp hạng tài phá án của thám tử
+   {:id :rule-danh-gia
+    :if :diem_so
+    :then {:ket_luan [:rpg/danh-gia :diem_so]}}
+ ]
+}

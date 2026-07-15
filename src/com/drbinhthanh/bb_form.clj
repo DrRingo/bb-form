@@ -8,7 +8,8 @@
             [com.drbinhthanh.bb-form.engines.gum :as gum]
             [com.drbinhthanh.bb-form.engines.tui :as tui]
             [com.drbinhthanh.bb-form.engines.winform :as winform]
-            [com.drbinhthanh.bb-form.engines.formsmd :as formsmd]))
+            [com.drbinhthanh.bb-form.engines.formsmd :as formsmd]
+            [com.drbinhthanh.bb-form.expert :as expert]))
 
 ;; Form loader - supports EDN and JSON
 (defn load-form [file-path]
@@ -145,19 +146,25 @@
                            ".")]
             (core/load-formulas! imports form-dir)))
 
-        (reset! core/answers {:selectedByUser {}
-                              :HiddenVar (get form :variables {})})
-        (swap! core/answers update :selectedByUser merge prefilled)
+        (let [is-expert (= (some-> (:format form) name str/lower-case) "expert")]
+          (if is-expert
+            (let [res (expert/run-expert-loop form prefilled {:engine chosen-engine :theme theme :marathon marathon})]
+              (reset! core/answers {:selectedByUser res :HiddenVar {}}))
+            (do
+              (let [resolved-prefilled (core/find-path form prefilled (boolean marathon))]
+                (reset! core/answers {:selectedByUser {}
+                                      :HiddenVar (get form :variables {})})
+                (swap! core/answers update :selectedByUser merge resolved-prefilled))
 
-        ;; Delegate form execution to the chosen engine
-        (case chosen-engine
-          :gum (gum/run form core/answers {:theme theme :marathon marathon})
-          :tui (tui/run form core/answers {:theme theme :marathon marathon})
-          :winform (winform/run form core/answers {:theme theme})
-          :formsmd (formsmd/run form core/answers {:theme theme :form-file form-file :output-file output-path :serve serve})
-          (do
-            (println "❌ Engine không hợp lệ:" chosen-engine)
-            (System/exit 1)))
+              ;; Delegate form execution to the chosen engine
+              (case chosen-engine
+                :gum (gum/run form core/answers {:theme theme :marathon marathon})
+                :tui (tui/run form core/answers {:theme theme :marathon marathon})
+                :winform (winform/run form core/answers {:theme theme})
+                :formsmd (formsmd/run form core/answers {:theme theme :form-file form-file :output-file output-path :serve serve})
+                (do
+                  (println "❌ Engine không hợp lệ:" chosen-engine)
+                  (System/exit 1))))))
 
         (when-not (= chosen-engine :formsmd)
           (let [out-file   (io/file output-path)

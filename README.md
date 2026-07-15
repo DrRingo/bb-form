@@ -10,12 +10,12 @@ A Babashka + Charm Gum CLI tool to collect data through beautiful terminal forms
 
 | Feature | Description |
 |---|---|
-| 🧠 **EDN Logic Engine** | Flat-list fields with `eval-expr` interpreter (`and/or/not/=/>/<`) |
+| 🧠 **Expert System** | Run with O'Doyle RETE forward-chaining rules and a backward-chaining solver when `:format :expert` is declared in the EDN file |
 | 🔀 **Dynamic `:show-if`** | Conditionally show/hide fields based on runtime state |
 | 🗄️ **Hidden Variables** | Declare `:variables` to track background state |
 | ⚡ **Side Effects** | `:actions` to mutate state on each answer |
 | 📦 **Formula Imports** | Import `.edn` or `.clj` formula libraries with namespace aliases |
-| 🔣 **`[:call]` Operator** | Call any imported function using `[:call :alias/fn-name arg …]` |
+| 🔣 **`[:call]` Operator** | Call any imported function using `[:call :alias/fn-name arg …]` or shorthand `[:alias/fn arg ...]` |
 | 🔍 **`[:get]` Operator** | Extract properties from complex map results |
 | 🎲 **Stochastic Support** | Integrate Bayesian Stan models via Clojure bridge scripts |
 | 🏷️ **Dynamic Labels** | Interpolate computed values into labels with `{{expr}}` |
@@ -84,6 +84,9 @@ bb-form forms/job_application.edn
 
 # Using the new native Clojure JLine3 TUI engine
 bb-form forms/job_application.edn --engine tui
+
+# Run a form that automatically runs in Expert System mode via its EDN format configuration
+bb-form forms/sanh-expert.edn
 
 # Non-interactive batch run
 bb-form forms/job_application.edn --values forms/values.edn --out result.edn
@@ -215,6 +218,14 @@ bb-form/
 ---
 
 ## 🗓️ Changelog
+
+### v2.3.0
+- ✅ **Expert System Mode (`:format :expert` or `:format "expert"`)**:
+  - Tightly integrated a RETE forward-chaining rules engine (`net.sekao/odoyle-rules`) and a backward-chaining solver (`resolve-var`) to interactively ask users only the logically required minimal set of questions to resolve the specified `:goals`.
+  - Added support for rule prioritization (`:priority` in rules) to handle conflict resolution when multiple rules overwrite a single output.
+  - Implemented automatic required variable detection from `:if` and `:then` formulas, making boilerplate `:exists :var` checks completely optional.
+  - Added support for the `:require [list of vars]` block at the rule level to explicitly specify dependencies.
+  - Supported namespace shorthand calling syntax (`[:ns/fn args...]` instead of `[:call :ns/fn args...]`).
 
 ### v2.2.0
 - ✅ **Forms.md Web Engine (`--engine formsmd`)**:

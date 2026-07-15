@@ -6,9 +6,9 @@ Form sử dụng thư viện tính toán ma trận bằng Clojure (.clj) để p
 ---
 
 :::
-{% set analysis_result = {} %}{{ setVal("analysis_result", analysis_result) }}
-{% set recommended_role = "Đang phân tích" %}{{ setVal("recommended_role", recommended_role) }}
-{% set best_score = 0 %}{{ setVal("best_score", best_score) }}
+{% set analysis_result = {} %}
+{% set recommended_role = "Đang phân tích" %}
+{% set best_score = 0 %}
 :::
 
 ho_ten* = TextInput(
@@ -31,9 +31,9 @@ devops_score* = NumberInput(
   | question = 4. Tự đánh giá kỹ năng DevOps/Deployment (0-10)
 )
 ::: [{$ devops_score $}]
-{% set analysis_result = score.analyze_candidate(ui_score, sys_score, algo_score, devops_score) %}{{ setVal("analysis_result", analysis_result) }}
-{% set recommended_role = score.get_recommended_role(analysis_result) %}{{ setVal("recommended_role", recommended_role) }}
-{% set best_score = score.get_best_score(analysis_result) %}{{ setVal("best_score", best_score) }}
+{% set analysis_result = score.analyze_candidate(ui_score, sys_score, algo_score, devops_score) %}
+{% set recommended_role = score.get_recommended_role(analysis_result) %}
+{% set best_score = score.get_best_score(analysis_result) %}
 :::
 
 ::: [{$ best_score $}]

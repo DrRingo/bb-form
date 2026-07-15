@@ -1,7 +1,5 @@
-;; Script kiểm thử cơ chế Restarting Loop
-;; Chạy: bb scripts/test_loop.bb
-(require '[clojure.edn :as edn])
-(load-file "src/com/drbinhthanh/bb_form.clj")
+(require '[clojure.edn :as edn]
+         '[com.drbinhthanh.bb-form.core :as core])
 
 (def form (edn/read-string (slurp "forms/backward_loop_test.edn")))
 (def ask-order (atom []))
@@ -12,16 +10,20 @@
    :tham_gia "Không"
    :ly_do_tu_choi "Tôi bận việc riêng"})
 
-;; Override các hàm UI và ask-field để không gọi gum
-(with-redefs [com.drbinhthanh.bb-form/clear-screen (fn [])
-              com.drbinhthanh.bb-form/render-header (fn [_])
-              com.drbinhthanh.bb-form/ask-field (fn [field form]
-                                                  (let [id (:id field)]
-                                                    (swap! ask-order conj id)
-                                                    (swap! com.drbinhthanh.bb-form/answers assoc-in [:selectedByUser (keyword id)] (get mock-inputs (keyword id)))))]
-  (reset! com.drbinhthanh.bb-form/answers {:selectedByUser {}})
-  (println "Đang chạy form với cơ chế Restarting Loop...")
-  (com.drbinhthanh.bb-form/run-form form))
+;; Tạo mock-ui-adapter
+(def mock-ui-adapter
+  {:clear-screen  (fn [])
+   :render-header (fn [_ _])
+   :show-error    (fn [_])
+   :ask-field     (fn [field form answers-atom]
+                    (let [id (:id field)]
+                      (swap! ask-order conj (keyword id))
+                      (swap! answers-atom assoc-in [:selectedByUser (keyword id)] (get mock-inputs (keyword id)))))
+   :pause         (fn [_])})
+
+(reset! core/answers {:selectedByUser {} :HiddenVar (get form :variables {})})
+(println "Đang chạy form với cơ chế Restarting Loop...")
+(core/run-terminal-form form core/answers mock-ui-adapter)
 
 (println "Thứ tự các câu hỏi được hỏi:" @ask-order)
 (if (= @ask-order [:ho_ten :tham_gia :ly_do_tu_choi])

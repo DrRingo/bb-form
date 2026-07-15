@@ -320,6 +320,97 @@ Khi viết form EDN, bạn khai báo `:type` theo các miền cơ bản (`:text`
 
 ---
 
+## 12. Chế Độ Hệ Chuyên Gia (Expert System Mode)
+
+Bắt đầu từ phiên bản `v2.3.0`, `bb-form` tích hợp một **Hệ Chuyên Gia (Expert System)** hoàn chỉnh sử dụng thuật toán duyệt ngược (Backward-Chaining Solver) kết hợp với động cơ suy diễn tiến RETE (`net.sekao/odoyle-rules`).
+
+### 12.1 Tại Sao Cần Chế Độ Hệ Chuyên Gia?
+Ở chế độ chạy form thông thường (Restarting Loop / show-if), form engine hiển thị câu hỏi tuần tự từ trên xuống dưới theo danh sách phẳng hoặc phân bước.
+Chế độ chuyên gia tự động kích hoạt khi phát hiện cấu hình `:format :expert` (hoặc `:format "expert"`) trong file EDN của bộ câu hỏi (không cần sử dụng cờ CLI `--expert`). Ở chế độ này, hệ thống không duyệt tuần tự nữa. Nó bắt đầu từ một danh sách các thuộc tính mục tiêu cần đạt được (khai báo trong `:goals`). Từ đó, hệ chuyên gia sẽ:
+1. Tìm các luật có khả năng sinh ra các thuộc tính `:goals` này.
+2. Xác định các biến đầu vào (primary variables - cần người dùng điền) hoặc biến trung gian (derived/intermediate variables) cần thiết để chạy luật đó.
+3. Chỉ hỏi các câu hỏi thực sự liên quan để đi tới kết luận mục tiêu. Cơ chế này giúp tối giản hóa số lượng câu hỏi cần hỏi người dùng (ví dụ: trong sản khoa, nếu ngôi thai là ngôi ngang, hệ thống đưa ra kết luận mổ khẩn cấp ngay mà không cần hỏi các câu hỏi tiếp theo về khung chậu, CTC hay ối).
+
+### 12.2 Cấu Hình File EDN Có Luật (Rules)
+
+Để chạy biểu mẫu ở chế độ Hệ chuyên gia, file EDN form cần bổ sung khai báo định dạng `:format` và hai thuộc tính mới cấp cao nhất:
+
+1. **`:format`**: Khai báo `:expert` để kích hoạt chế độ Hệ chuyên gia (mặc định nếu không khai báo hoặc chọn `:normal` thì hệ thống sẽ chạy ở chế độ câu hỏi rẽ nhánh thông thường).
+2. **`:goals`**: Một vector chứa các keyword định danh các biến mục tiêu cần kết luận cuối cùng.
+3. **`:rules`**: Một vector chứa danh sách các luật suy diễn.
+
+#### Cấu Trúc Chi Tiết Của Một Rule:
+```clojure
+{:id       :tên-luật-duy-nhất ; (Keyword - Bắt buộc)
+ :priority mức-ưu-tiên        ; (Number - Tùy chọn, mặc định 0) Độ ưu tiên giải quyết xung đột
+ :require  [:biến1 :biến2]     ; (Vector - Tùy chọn) Khai báo thủ công các biến phụ thuộc
+ :if       [:biểu-thức-logic] ; (Vector - Tùy chọn) Điều kiện kích hoạt luật (LHS)
+ :then     {:biến-kết-quả [:biểu-thức-tính]}} ; (Map - Bắt buộc) Gán kết quả khi luật thỏa mãn (RHS)
+```
+
+- **`:if` (Left-Hand Side)**: Biểu thức logic EDN thông thường. Nếu `:if` bị bỏ qua, luật sẽ luôn được coi là thỏa mãn điều kiện khi tất cả các biến phụ thuộc được giải quyết.
+- **`:then` (Right-Hand Side)**: Gán giá trị hoặc biểu thức tính toán động cho biến kết quả.
+- **`:require`**: Khai báo danh sách các biến cần thiết mà không xuất hiện trực tiếp trong công thức của `:if` hoặc `:then` (ví dụ: các rule fallback cần chạy sau khi các biến đầu vào đã được nhập đầy đủ).
+- **`:priority`**: Giá trị số nguyên. Khi nhiều luật ghi đè kết quả cho cùng một thuộc tính mục tiêu, luật nào có `:priority` cao hơn sẽ giành chiến thắng (đè giá trị).
+
+### 12.3 Cơ Chế Tự Động Phân Tích Phụ Thuộc (Auto Dependency Detection)
+Hệ chuyên gia sẽ tự động phân tích cú pháp biểu thức trong `:if` và `:then` để nhận diện tất cả các biến số được tham chiếu (nhận dạng qua từ khóa `:ten_bien` hoặc `[:var :ten_bien]`).
+Bạn **không cần** viết các kiểm tra `:exists` rườm rà. Solver sẽ tự động bảo đảm tất cả các biến phụ thuộc này được điền đầy đủ thông tin (không ở trạng thái chưa trả lời `:not-answered`) trước khi cho phép luật đó kích hoạt.
+
+### 12.4 Cú Pháp Gọi Hàm Rút Gọn (Shorthand Call)
+Trong phần công thức `:then`, bạn có thể gọi trực tiếp hàm Clojure từ các namespace ngoài đã import (ví dụ: `[:triage/tinh-news2 :nhip_tho :nhip_tim]`) thay vì phải bọc qua toán tử `[:call :triage/tinh-news2 ...]`, giúp biểu thức cực kỳ ngắn gọn và trực quan.
+
+### 12.5 Ví Dụ Biểu Mẫu Hệ Chuyên Gia Đơn Giản
+
+```clojure
+{:title "Hệ thống duyệt vay tín dụng chuyên gia"
+ :goals [:ket_luan_vay]
+
+ :import [["../formulas/loan_utils.clj" :as :loan]]
+
+ :fields
+ [{:id       :tuoi
+   :label    "Tuổi người vay?"
+   :type     :number
+   :required true}
+  {:id       :thu_nhap
+   :label    "Thu nhập hàng tháng (triệu)?"
+   :type     :number
+   :required true}
+  {:id       :no_xau
+   :label    "Có lịch sử nợ xấu không?"
+   :type     :select
+   :options  ["Có" "Không"]
+   :required true}]
+
+ :rules
+ [;; Luật 1: Nếu quá tuổi hoặc chưa đủ tuổi → Từ chối thẳng (Ưu tiên cao 50)
+  {:id       :rule-tu-choi-tuoi
+   :priority 50
+   :if       [:or [:< :tuoi 18] [:> :tuoi 70]]
+   :then     {:ket_luan_vay "❌ TỪ CHỐI - Độ tuổi không hợp lệ."}}
+
+  ;; Luật 2: Nếu có nợ xấu → Từ chối thẳng (Ưu tiên cao 40)
+  {:id       :rule-tu-choi-no-xau
+   :priority 40
+   :if       [:= :no_xau "Có"]
+   :then     {:ket_luan_vay "❌ TỪ CHỐI - Có lịch sử nợ xấu."}}
+
+  ;; Luật 3: Duyệt vay tự động qua hàm Clojure (Ưu tiên thấp 10)
+  {:id       :rule-tinh-duyet-vay
+   :priority 10
+   :then     {:ket_luan_vay [:loan/tinh-duyet :tuoi :thu_nhap]}}]
+}
+```
+
+Khi chạy biểu mẫu này với lệnh:
+```bash
+bb-form forms/expert_loan.edn
+```
+- Nếu người dùng nhập `tuoi: 75`, hệ thống lập tức kích hoạt `rule-tu-choi-tuoi` và trả ra kết luận từ chối, kết thúc chương trình mà **không bao giờ hỏi** câu hỏi về `thu_nhap` hay `no_xau`.
+
+---
+
 ## Tổng Kết Luồng Hoạt Động Của Hệ Thống
 
 1. **Nạp biến:** Engine nạp `:variables` Global và dữ liệu từ dòng lệnh (`--values`).

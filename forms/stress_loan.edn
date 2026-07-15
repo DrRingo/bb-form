@@ -1,0 +1,151 @@
+;; ═══════════════════════════════════════════════════════════════
+;; STRESS TEST 1: Loan Approval Expert System
+;; Mục tiêu kiểm tra:
+;;   ✅ Chuỗi rules 4 tầng (input → diem → muc-vay/lai-suat → ket-luan)
+;;   ✅ Conflict Resolution: rule :priority cao ghi đè kết luận thấp hơn
+;;   ✅ Optional fields (:required false) nạp nil/default đúng
+;;   ✅ Dynamic default Phương án A tính theo thu-nhap đã trả lời
+;;   ✅ Biến ẩn trung gian: ky_han_nam (từ string → number)
+;; ═══════════════════════════════════════════════════════════════
+
+{:format      :expert
+ :title       "Hệ Thống Phê Duyệt Vay Tín Dụng"
+ :description "Điền thông tin để hệ thống tự động tính điểm và đưa ra quyết định cho vay."
+
+ :import [["../formulas/loan_utils.clj" :as :loan]]
+
+ :goals [:ket_luan_vay]
+
+ :fields
+ [;; === THÔNG TIN CÁ NHÂN ===
+  {:id       :ho_ten
+   :label    "Họ và tên người vay"
+   :type     :text
+   :required true
+   :priority 100}
+
+  {:id       :tuoi
+   :label    "Tuổi"
+   :type     :number
+   :required true
+   :priority 95}
+
+  {:id       :nghe_nghiep
+   :label    "Nghề nghiệp hiện tại"
+   :type     :select
+   :required true
+   :options  ["Công chức/Viên chức" "Nhân viên văn phòng" "Kinh doanh tự do"
+              "Công nhân" "Nông dân" "Không có việc làm"]
+   :priority 90}
+
+  ;; === TÀI CHÍNH ===
+  {:id       :thu_nhap_thang
+   :label    "Thu nhập hàng tháng (triệu đồng/tháng)"
+   :type     :number
+   :required true
+   :priority 85}
+
+  {:id       :no_hien_tai
+   :label    "Tổng nợ hiện tại (triệu đồng)"
+   :type     :number
+   :required true
+   :default  0
+   :priority 80}
+
+  {:id       :lich_su_tra_no
+   :label    "Lịch sử trả nợ"
+   :type     :select
+   :required true
+   :options  ["Tốt" "Trung bình" "Kém" "Chưa từng vay"]
+   :priority 75}
+
+  ;; Optional field: solver phải xử lý được khi không cung cấp
+  {:id       :tai_san_dam_bao
+   :label    "Giá trị tài sản đảm bảo (triệu đồng, 0 nếu không có)"
+   :type     :number
+   :required false
+   :default  0
+   :priority 70}
+
+  ;; === YÊU CẦU VAY ===
+  {:id       :so_tien_vay
+   :label    "Số tiền muốn vay (triệu đồng)"
+   :type     :number
+   :required true
+   :priority 65}
+
+  ;; Dynamic default Phương án A: kỳ hạn mặc định tùy thu nhập
+  {:id       :ky_han_vay
+   :label    "Kỳ hạn vay (năm)"
+   :type     :select
+   :required true
+   :options  ["1" "2" "3" "5" "10" "15" "20"]
+   :default  [:if [:>= :thu_nhap_thang 30] "5" "3"]
+   :priority 60}
+
+  ;; === KẾT QUẢ HIỂN THỊ ===
+  {:id       :ket_qua_hien_thi
+   :label    "=== KẾT QUẢ XÉT DUYỆT ===\nKhách hàng: {{ho_ten}} ({{tuoi}} tuổi)\nThu nhập: {{thu_nhap_thang}} triệu/tháng\nĐiểm tín dụng: {{diem_tin_dung}}/100\nMức vay tối đa: {{muc_vay_toi_da}} triệu\nLãi suất đề nghị: {{lai_suat_de_nghi}}% năm\n\n{{ket_luan_vay}}"
+   :type     :info
+   :required true
+   :default  [:if [:exists :ket_luan_vay] "OK" :not-answered]
+   :priority 10}
+ ]
+
+ :rules
+ [
+  ;; ─── TẦNG TIỀN XỬ LÝ: Chuyển kỳ hạn từ string → số (biến ẩn trung gian) ───
+  {:id       :rule-parse-ky-han
+   :priority 10
+   :then     {:ky_han_nam [:if [:= :ky_han_vay "1"] 1
+                           [:if [:= :ky_han_vay "2"] 2
+                            [:if [:= :ky_han_vay "3"] 3
+                             [:if [:= :ky_han_vay "5"] 5
+                              [:if [:= :ky_han_vay "10"] 10
+                               [:if [:= :ky_han_vay "15"] 15 20]]]]]]}}
+
+  ;; ─── TẦNG 1: Tính điểm tín dụng ───
+  {:id       :rule-tinh-diem-tin-dung
+   :priority 10
+   :then     {:diem_tin_dung [:call :loan/tinh-diem-tin-dung
+                               :thu_nhap_thang
+                               :no_hien_tai
+                               :lich_su_tra_no
+                               :tai_san_dam_bao]}}
+
+  ;; ─── TẦNG 2a: Mức vay tối đa ───
+  {:id       :rule-tinh-muc-vay
+   :priority 10
+   :then     {:muc_vay_toi_da [:call :loan/tinh-muc-vay-toi-da
+                                :diem_tin_dung
+                                :thu_nhap_thang]}}
+
+  ;; ─── TẦNG 2b: Lãi suất ───
+  {:id       :rule-tinh-lai-suat
+   :priority 10
+   :then     {:lai_suat_de_nghi [:call :loan/tinh-lai-suat
+                                  :diem_tin_dung
+                                  :ky_han_nam]}}
+
+  ;; ─── TẦNG 3: Kết luận cuối ───
+  {:id       :rule-xet-duyet
+   :priority 10
+   :then     {:ket_luan_vay [:call :loan/xep-loai-ho-so
+                              :diem_tin_dung
+                              :muc_vay_toi_da
+                              :so_tien_vay
+                              :lai_suat_de_nghi]}}
+
+  ;; ─── CONFLICT priority 50: Blacklist thất nghiệp (ghi đè tầng 3) ───
+  {:id       :rule-tu-choi-that-nghiep
+   :priority 50
+   :if       [:= :nghe_nghiep "Không có việc làm"]
+   :then     {:ket_luan_vay "❌ TỪ CHỐI - Người vay không có nguồn thu nhập ổn định."}}
+
+  ;; ─── CONFLICT priority 40: Từ chối theo tuổi ───
+  {:id       :rule-tu-choi-tuoi
+   :priority 40
+   :if       [:or [:> :tuoi 70] [:< :tuoi 18]]
+   :then     {:ket_luan_vay "❌ TỪ CHỐI - Độ tuổi không đủ điều kiện (18–70 tuổi)."}}
+ ]
+}

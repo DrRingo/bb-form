@@ -1,0 +1,13 @@
+{:selectedByUser
+ {:ngoi_thai "Đầu",
+  :can_nang_thai 3000,
+  :do_xoa_ctc "60%",
+  :ket_luan
+  "Tiếp tục theo dõi sát tiến triển của cổ tử cung, độ xóa mở và tim thai",
+  :nuoc_oi "Còn",
+  :do_mo_ctc "Mở 2cm",
+  :state :active,
+  :chuyen_da_hoat_dong true,
+  :nguy_co_nhiem_trung false,
+  :khung_chau "Bình thường"},
+ :HiddenVar {}}

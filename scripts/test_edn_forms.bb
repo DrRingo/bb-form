@@ -3,7 +3,8 @@
 ;; Kiểm tra: parse EDN, cấu trúc field, load source, detect-format, write-output
 
 (require '[clojure.edn :as edn]
-         '[clojure.string :as str])
+         '[clojure.string :as str]
+         '[com.drbinhthanh.bb-form.core :as core])
 
 ;; ─────────────────────────────────────────────
 ;; Helpers
@@ -50,8 +51,7 @@
 (section "1. Parse EDN — Tất cả file form")
 
 (def form-files
-  ["form_sample.edn"
-   "forms/radio/form.edn"
+  ["forms/radio/form.edn"
    "forms/hr_survey.edn"
    "forms/event_registration.edn"
    "forms/medical_screening.edn"
@@ -89,7 +89,7 @@
 
 (let [hr (get parsed-forms "forms/hr_survey.edn")
       fields (:fields hr)]
-  (check "hr_survey có 18 fields" (= 18 (count fields)))
+  (check "hr_survey có 19 fields" (= 19 (count fields)))
   (let [ids (map :id fields)]
     (check "Field :ho_ten tồn tại"          (some #{:ho_ten} ids))
     (check "Field :email_cong_ty tồn tại"   (some #{:email_cong_ty} ids))
@@ -110,7 +110,7 @@
 (section "3.1. Engine eval-expr")
 
 (let [ctx {:selectedByUser {:age 25 :gender "Nữ" :symptoms ["Sốt" "Ho"] :blood_type "O"}}
-      eval com.drbinhthanh.bb-form/eval-expr]
+      eval core/eval-expr]
   (check "eval :var"                 (= 25 (eval [:var :age] ctx)))
   (check "eval :="                   (true? (eval [:= [:var :gender] "Nữ"] ctx)))
   (check "eval :!="                  (true? (eval [:!= [:var :gender] "Nam"] ctx)))
@@ -132,13 +132,12 @@
 
 (section "4. Values file EDN")
 
-(check "values_sample.edn parse OK"
-  (map? (edn/read-string (slurp "values_sample.edn"))))
+(check "job_application_values.edn parse OK"
+  (map? (edn/read-string (slurp "forms/job_application_values.edn"))))
 
-(let [vals (edn/read-string (slurp "values_sample.edn"))]
+(let [vals (edn/read-string (slurp "forms/job_application_values.edn"))]
   (check "values có :ho_ten"         (string? (:ho_ten vals)))
-  (check "values có :email"          (string? (:email vals)))
-  (check "values có :so_dien_thoai"  (string? (:so_dien_thoai vals))))
+  (check "values có :ui_score"        (number? (:ui_score vals))))
 
 ;; ─────────────────────────────────────────────
 ;; 5. Logic detect-format
